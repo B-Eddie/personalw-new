@@ -63,7 +63,8 @@ export class AnimationManager {
     tl.to(
       root.position,
       {
-        z: 1.5,
+        // Because we start farther away (negative z), move slightly forward but still distant
+        z: root.position.z + 1.5,
         ease: "none",
         duration: 0.5,
       },
@@ -74,7 +75,7 @@ export class AnimationManager {
     tl.to(
       root.position,
       {
-        z: root.position.z + 4,
+        z: root.position.z + 8, // y value when zooming in
         y: 0,
         ease: "power1.out",
         duration: 0.5,

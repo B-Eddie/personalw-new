@@ -17,6 +17,8 @@ export class LaptopModel {
     // Key parts extracted from model
     this.base = null; // Mesh named 'BaseMesh'
     this.screen = null; // Mesh named 'ScreenMesh'
+    this.desk = null; // Mesh named 'Desk'
+    this.notebookAccessory = null; // Mesh named 'Notebook' (paper accessory)
     this.hinge = null; // Chosen hinge element (base or screen)
     this._screenMaterialTargets = []; // meshes considered screen display
     this._dynamicTexture = null; // THREE.Texture for dynamic canvas
@@ -70,6 +72,8 @@ export class LaptopModel {
     // Put parts under master group in a consistent order
     if (this.screen) this.group.add(this.screen);
     if (this.base) this.group.add(this.base);
+    if (this.desk) this.group.add(this.desk);
+    if (this.notebookAccessory) this.group.add(this.notebookAccessory);
 
     // Config extraction with defaults
     const { laptop = {} } = CONFIG;
@@ -78,6 +82,7 @@ export class LaptopModel {
       startClosedAngleRad,
       flipViewY,
       modelScale,
+      initialRootPosition,
       initialGroupRotation,
       logoAspectAdjust = 1,
       logoForceSquare = true,
@@ -89,11 +94,63 @@ export class LaptopModel {
       logoAutoAspect = true,
       logoDebug = false,
       contentYOffset = 0,
-      screenAxes = { width: 'x', height: 'y' },
+      screenAxes = { width: "x", height: "y" },
       logoAutoUVComp = true,
       logoAutoTangentComp = true,
+      deskScale = 1,
+      deskOffset = null,
+      notebookTransform = null,
     } = laptop;
-    this._logoConfig = { logoAspectAdjust, logoForceSquare, progressBarOffset, logoYOffset, nameGap, logoManualScaleX, logoManualScaleY, logoAutoAspect, logoDebug, contentYOffset, screenAxes, logoAutoUVComp, logoAutoTangentComp };
+    this._logoConfig = {
+      logoAspectAdjust,
+      logoForceSquare,
+      progressBarOffset,
+      logoYOffset,
+      nameGap,
+      logoManualScaleX,
+      logoManualScaleY,
+      logoAutoAspect,
+      logoDebug,
+      contentYOffset,
+      screenAxes,
+      logoAutoUVComp,
+      logoAutoTangentComp,
+    };
+
+    // Scale desk (before alignment) if configured
+    if (this.desk && deskScale && deskScale !== 1) {
+      this.desk.scale.setScalar(deskScale);
+    }
+
+    // Align desk & notebook accessory so they sit under the laptop (after scaling desk)
+    this._autoAlignSurface();
+
+    // Apply desk forward offset (after alignment so vertical contact preserved)
+    if (this.desk && deskOffset) {
+      if (typeof deskOffset.x === "number")
+        this.desk.position.x += deskOffset.x;
+      if (typeof deskOffset.y === "number")
+        this.desk.position.y += deskOffset.y;
+      if (typeof deskOffset.z === "number")
+        this.desk.position.z += deskOffset.z;
+    }
+
+    // Apply notebook accessory transform (position + rotation) if specified
+    if (this.notebookAccessory && notebookTransform) {
+      const p = notebookTransform.position || {};
+      if (typeof p.x === "number") this.notebookAccessory.position.x += p.x;
+      if (typeof p.y === "number") this.notebookAccessory.position.y += p.y;
+      if (typeof p.z === "number") this.notebookAccessory.position.z += p.z;
+      const r = notebookTransform.rotationEulerDeg || {};
+      // Convert degrees to radians when provided
+      const toRad = (deg) => (deg * Math.PI) / 180;
+      if (typeof r.x === "number")
+        this.notebookAccessory.rotation.x += toRad(r.x);
+      if (typeof r.y === "number")
+        this.notebookAccessory.rotation.y += toRad(r.y);
+      if (typeof r.z === "number")
+        this.notebookAccessory.rotation.z += toRad(r.z);
+    }
 
     // Choose hinge: prefer requested part; fall back to whichever exists
     this.hinge =
@@ -127,6 +184,10 @@ export class LaptopModel {
       const { x = 0, y = 0, z = 0 } = initialGroupRotation;
       this.group.rotation.set(x, y, z);
     }
+    if (initialRootPosition) {
+      const { x = 0, y = 0, z = 0 } = initialRootPosition;
+      this.group.position.set(x, y, z);
+    }
 
     this._loaded = true;
     this._resolveReady?.(this);
@@ -136,11 +197,16 @@ export class LaptopModel {
   _identifyNodes(rootScene) {
     this.base = null;
     this.screen = null;
+    this.desk = null;
+    this.notebookAccessory = null;
     rootScene.traverse((child) => {
       if (!child.name) return;
       const nameLower = child.name.toLowerCase();
       if (nameLower === "basemesh") this.base = child;
       if (nameLower === "screenmesh") this.screen = child;
+      if (!this.desk && /desk/.test(nameLower)) this.desk = child;
+      if (!this.notebookAccessory && nameLower === "notebook")
+        this.notebookAccessory = child;
     });
     // Texture application handled after model load; avoid accessing screen.material here (screen may be a Group)
   }
@@ -274,9 +340,9 @@ export class LaptopModel {
     const size = new THREE.Vector3();
     bb.getSize(size);
     // Identify thickness as smallest dimension; width & height are other two
-    const { screenAxes = { width: 'x', height: 'y' } } = this._logoConfig || {};
-    const widthAxis = screenAxes.width || 'x';
-    const heightAxis = screenAxes.height || 'y';
+    const { screenAxes = { width: "x", height: "y" } } = this._logoConfig || {};
+    const widthAxis = screenAxes.width || "x";
+    const heightAxis = screenAxes.height || "y";
     const width = size[widthAxis];
     const height = size[heightAxis];
     if (width > 0 && height > 0) this._screenGeomAspect = width / height;
@@ -288,14 +354,17 @@ export class LaptopModel {
       try {
         const uv = geo.attributes.uv;
         // sample min/max U/V
-        let uMin = Infinity, uMax = -Infinity, vMin = Infinity, vMax = -Infinity;
+        let uMin = Infinity,
+          uMax = -Infinity,
+          vMin = Infinity,
+          vMax = -Infinity;
         for (let i = 0; i < uv.count; i++) {
           const u = uv.getX(i);
-            const v = uv.getY(i);
-            if (u < uMin) uMin = u;
-            if (u > uMax) uMax = u;
-            if (v < vMin) vMin = v;
-            if (v > vMax) vMax = v;
+          const v = uv.getY(i);
+          if (u < uMin) uMin = u;
+          if (u > uMax) uMax = u;
+          if (v < vMin) vMin = v;
+          if (v > vMax) vMax = v;
         }
         const uvW = uMax - uMin;
         const uvH = vMax - vMin;
@@ -313,7 +382,12 @@ export class LaptopModel {
     }
 
     // Tangent-based compensation: sample a few triangles to estimate average stretching
-    if (this._logoConfig?.logoAutoTangentComp && geo.index && geo.attributes.position && geo.attributes.uv) {
+    if (
+      this._logoConfig?.logoAutoTangentComp &&
+      geo.index &&
+      geo.attributes.position &&
+      geo.attributes.uv
+    ) {
       try {
         const pos = geo.attributes.position;
         const uv = geo.attributes.uv;
@@ -323,25 +397,41 @@ export class LaptopModel {
         const vA = new THREE.Vector3();
         const vB = new THREE.Vector3();
         const vC = new THREE.Vector3();
-        for (let i = 0; i < indexArr.length && count < 300; i += 3) { // sample up to 300 tris
-          const a = indexArr[i], b = indexArr[i+1], c = indexArr[i+2];
+        for (let i = 0; i < indexArr.length && count < 300; i += 3) {
+          // sample up to 300 tris
+          const a = indexArr[i],
+            b = indexArr[i + 1],
+            c = indexArr[i + 2];
           vA.fromBufferAttribute(pos, a);
           vB.fromBufferAttribute(pos, b);
           vC.fromBufferAttribute(pos, c);
-          const uxA = uv.getX(a), uyA = uv.getY(a);
-          const uxB = uv.getX(b), uyB = uv.getY(b);
-          const uxC = uv.getX(c), uyC = uv.getY(c);
+          const uxA = uv.getX(a),
+            uyA = uv.getY(a);
+          const uxB = uv.getX(b),
+            uyB = uv.getY(b);
+          const uxC = uv.getX(c),
+            uyC = uv.getY(c);
           // Build two edges in 3D
           const e1 = vB.clone().sub(vA);
           const e2 = vC.clone().sub(vA);
-          const du1 = uxB - uxA; const dv1 = uyB - uyA;
-          const du2 = uxC - uxA; const dv2 = uyC - uyA;
+          const du1 = uxB - uxA;
+          const dv1 = uyB - uyA;
+          const du2 = uxC - uxA;
+          const dv2 = uyC - uyA;
           const det = du1 * dv2 - du2 * dv1;
           if (Math.abs(det) < 1e-6) continue;
           // Solve for partial derivatives (dPos/du, dPos/dv)
           const invDet = 1 / det;
-          const dPos_du = e1.clone().multiplyScalar(dv2).sub(e2.clone().multiplyScalar(dv1)).multiplyScalar(invDet);
-          const dPos_dv = e2.clone().multiplyScalar(du1).sub(e1.clone().multiplyScalar(du2)).multiplyScalar(invDet);
+          const dPos_du = e1
+            .clone()
+            .multiplyScalar(dv2)
+            .sub(e2.clone().multiplyScalar(dv1))
+            .multiplyScalar(invDet);
+          const dPos_dv = e2
+            .clone()
+            .multiplyScalar(du1)
+            .sub(e1.clone().multiplyScalar(du2))
+            .multiplyScalar(invDet);
           const lenU = dPos_du.length();
           const lenV = dPos_dv.length();
           if (lenV > 0) {
@@ -390,7 +480,11 @@ export class LaptopModel {
       const logoAlpha = Math.min(1, this._bootPhase * 2); // quicker fade in
       if (this._bootLogoLoaded && this._bootLogoImage) {
         // Compute aspect correction once (compare world displayed aspect vs canvas aspect)
-  if (this._logoAspectCorrection == null && this.screen && this._logoConfig.logoAutoAspect) {
+        if (
+          this._logoAspectCorrection == null &&
+          this.screen &&
+          this._logoConfig.logoAutoAspect
+        ) {
           try {
             // Use world box for screen group
             const worldBox = new THREE.Box3().setFromObject(this.screen);
@@ -412,67 +506,48 @@ export class LaptopModel {
           }
         }
         const img = this._bootLogoImage;
-        // Target max height 160, maintain aspect, cap width to 25% canvas width
-        const targetMaxHeight = 160;
-        const scaleH = targetMaxHeight / img.naturalHeight;
-        let drawW = img.naturalWidth * scaleH;
-        let drawH = targetMaxHeight;
-        if (this._logoConfig.logoForceSquare) {
-          // Use the smaller to enforce square to combat distortion
-          const side = Math.min(drawW, drawH);
-          drawW = side;
-          drawH = side;
-        }
-        const maxWidth = w * 0.25;
-        if (drawW > maxWidth) {
-          const s = maxWidth / drawW;
-          drawW *= s;
-          drawH *= s;
-        }
+        // Hardcoded circular profile picture (pfp)
+        const targetDiameter = 180; // fixed visual size
+        const maxDiameter = w * 0.28; // cap to 28% of screen width
+        const diameter = Math.min(targetDiameter, maxDiameter);
+        const radius = diameter / 2;
         const cx = w / 2;
-  const cy = h / 2 + (this._logoConfig.logoYOffset || -60) + (this._logoConfig.contentYOffset || 0);
+        const cy =
+          h / 2 +
+          (this._logoConfig.logoYOffset || -60) +
+          (this._logoConfig.contentYOffset || 0);
         ctx.save();
         ctx.globalAlpha = logoAlpha;
-        // Translate to center and apply horizontal correction if needed
         ctx.translate(cx, cy);
-        let scaleX = 1;
-        let scaleY = 1;
-        if (this._logoAspectCorrection && this._logoAspectCorrection !== 1) {
-          scaleX *= this._logoAspectCorrection;
+        // Perfect circle mask, ignore aspect correction logic intentionally (hardcoded request)
+        ctx.beginPath();
+        ctx.arc(0, 0, radius, 0, Math.PI * 2);
+        ctx.closePath();
+        ctx.clip();
+        // Draw image fitted to circle bounds (cover strategy)
+        const naturalRatio = img.naturalWidth / img.naturalHeight;
+        let drawW = diameter;
+        let drawH = diameter;
+        // If image not square, scale so the smaller dimension fills, center crop
+        if (naturalRatio > 1) {
+          // wider than tall: height fits, width overflows
+          drawW = diameter * naturalRatio;
+        } else if (naturalRatio < 1) {
+          // taller: width fits, height overflows
+          drawH = diameter / naturalRatio;
         }
-        if (this._logoUVCorrection && this._logoUVCorrection !== 1) {
-          scaleX *= this._logoUVCorrection;
-        }
-        if (this._logoTangentCorrection && this._logoTangentCorrection !== 1) {
-          scaleX *= this._logoTangentCorrection;
-        }
-        if (this._logoConfig.logoAspectAdjust !== 1) {
-          scaleX *= this._logoConfig.logoAspectAdjust;
-        }
-        // Apply manual overrides last
-        scaleX *= this._logoConfig.logoManualScaleX || 1;
-        scaleY *= this._logoConfig.logoManualScaleY || 1;
-        if (scaleX !== 1 || scaleY !== 1) ctx.scale(scaleX, scaleY);
         ctx.drawImage(img, -drawW / 2, -drawH / 2, drawW, drawH);
-        if (this._logoConfig.logoDebug) {
-          ctx.strokeStyle = "#0f0";
-          ctx.lineWidth = 2 / (scaleX || 1); // keep stroke thin after scale
-          ctx.beginPath();
-          const r = Math.min(drawW, drawH) / 2;
-          ctx.arc(0, 0, r, 0, Math.PI * 2);
-          ctx.stroke();
-        }
         ctx.restore();
-  // Draw name under logo
-  ctx.save();
-  ctx.globalAlpha = logoAlpha; // fade in with logo
-  ctx.font = "40px -apple-system,Helvetica,Arial,sans-serif";
-  ctx.fillStyle = "white";
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-  const textY = cy + drawH / 2 * (this._logoConfig.logoManualScaleY || 1) + (this._logoConfig.nameGap || 35);
-  ctx.fillText("Eddie Bian", w / 2, textY);
-  ctx.restore();
+        // Draw name under logo
+        ctx.save();
+        ctx.globalAlpha = logoAlpha; // fade in with logo
+        ctx.font = "40px -apple-system,Helvetica,Arial,sans-serif";
+        ctx.fillStyle = "white";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        const textY = cy + radius + (this._logoConfig.nameGap || 35);
+        ctx.fillText("Eddie Bian", w / 2, textY);
+        ctx.restore();
       } else {
         // Fallback: simple fading rectangle while image loads
         const placeholderSize = 100;
@@ -493,7 +568,10 @@ export class LaptopModel {
       const barWidth = w * 0.4;
       const barHeight = 8;
       const barX = (w - barWidth) / 2;
-  const barY = h / 2 + (this._logoConfig.progressBarOffset || 80) + (this._logoConfig.contentYOffset || 0);
+      const barY =
+        h / 2 +
+        (this._logoConfig.progressBarOffset || 80) +
+        (this._logoConfig.contentYOffset || 0);
       const radius = barHeight / 2; // pill shape
       ctx.globalAlpha = barVisibleP;
       // Outline
@@ -526,7 +604,7 @@ export class LaptopModel {
         ctx.fillStyle = "#bbb";
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
-  ctx.fillText("Scroll to continue", w / 2, barY + 90);
+        ctx.fillText("Scroll to continue", w / 2, barY + 90);
         ctx.globalAlpha = 1;
       }
     }
@@ -558,6 +636,38 @@ export class LaptopModel {
 
   getRootGroup() {
     return this.group;
+  }
+
+  // Ensure desk & accessory stay flush beneath the laptop base
+  _autoAlignSurface() {
+    if (!this.base || !this.desk) return;
+    try {
+      const baseBB = new THREE.Box3().setFromObject(this.base);
+      const deskBB = new THREE.Box3().setFromObject(this.desk);
+      if (!baseBB.isEmpty() && !deskBB.isEmpty()) {
+        const baseBottomY = baseBB.min.y;
+        const deskTopY = deskBB.max.y;
+        const delta = baseBottomY - deskTopY; // shift desk upward if there's a gap
+        if (Math.abs(delta) > 1e-4) {
+          this.desk.position.y += delta;
+          if (this.notebookAccessory)
+            this.notebookAccessory.position.y += delta;
+        }
+      }
+      if (this.notebookAccessory) {
+        const nbBB = new THREE.Box3().setFromObject(this.notebookAccessory);
+        const deskBB2 = new THREE.Box3().setFromObject(this.desk);
+        if (!nbBB.isEmpty() && !deskBB2.isEmpty()) {
+          const bottom = nbBB.min.y;
+          const top = deskBB2.max.y;
+          const offset = top - bottom;
+          if (Math.abs(offset) > 1e-4)
+            this.notebookAccessory.position.y += offset;
+        }
+      }
+    } catch (e) {
+      console.warn("[LaptopModel] _autoAlignSurface failed", e);
+    }
   }
 }
 

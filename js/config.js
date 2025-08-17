@@ -18,22 +18,31 @@ export const CONFIG = {
     finalScale: 10,
     finalCamera: { z: 4.5, y: 1.1 },
     modelScale: 0.1,
+    // New: initial root group offset so the laptop starts farther away
+    initialRootPosition: { z: -3.5, y: -15, x: 0 },
     finalTiltX: -0.9, // body tilt after opening
     hingePart: "screen", // ensure screen rotates, not base
     useBootScreen: true, // render dynamic boot screen instead of static jpg
-  logoAspectAdjust: 1, // manual horizontal stretch factor ( >1 widens, <1 narrows )
-  logoForceSquare: true, // clamp drawn logo to a square to resist distortion
-  progressBarOffset: 140, // vertical offset from vertical center (was 80) to push bar lower
-  logoYOffset: -140, // vertical offset from canvas center for logo (negative = higher)
-  nameGap: 60, // gap between logo bottom and name text (increased)
-  logoManualScaleX: 1, // manual post-correction horizontal scale (tweak if still oval)
-  logoManualScaleY: 1, // manual post-correction vertical scale
-  logoAutoAspect: true, // toggle automatic aspect compensation
-  logoDebug: false, // when true draws a thin test circle outline for visual calibration
-  contentYOffset: 0, // global shift applied to ALL boot content (logo, name, bar)
-  screenAxes: { width: 'x', height: 'y' }, // which geometry axes represent screen width & height
-  logoAutoUVComp: true, // auto compensate for UV vs world aspect distortion
-  logoAutoTangentComp: true, // deeper geometric UV tangent compensation
+    logoAspectAdjust: 1, // manual horizontal stretch factor ( >1 widens, <1 narrows )
+    logoForceSquare: true, // clamp drawn logo to a square to resist distortion
+    progressBarOffset: 140, // vertical offset from vertical center (was 80) to push bar lower
+    logoYOffset: -140, // vertical offset from canvas center for logo (negative = higher)
+    nameGap: 60, // gap between logo bottom and name text (increased)
+    logoManualScaleX: 1, // manual post-correction horizontal scale (tweak if still oval)
+    logoManualScaleY: 1, // manual post-correction vertical scale
+    logoAutoAspect: true, // toggle automatic aspect compensation
+    logoDebug: false, // when true draws a thin test circle outline for visual calibration
+    contentYOffset: 0, // global shift applied to ALL boot content (logo, name, bar)
+    screenAxes: { width: "x", height: "y" }, // which geometry axes represent screen width & height
+    logoAutoUVComp: true, // auto compensate for UV vs world aspect distortion
+    logoAutoTangentComp: true, // deeper geometric UV tangent compensation
+    deskScale: 100, // scale factor applied to desk mesh ( >1 enlarges )
+    // Positional/rotational adjustments for desk & physical notebook accessory
+    deskOffset: { x: 0, y: 0, z: 15 }, // move desk slightly forward toward camera
+    notebookTransform: {
+      position: { x: 0, y: -15, z: 30 }, // slight forward & downward shift
+      rotationEulerDeg: { x: 90, y: 0, z: 90 }, // small yaw & tilt for natural placement
+    },
   },
   camera: {
     initialPosition: { x: 0, y: 6, z: 0.01 },
