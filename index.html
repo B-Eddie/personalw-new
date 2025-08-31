@@ -9,6 +9,124 @@
   <body>
     <canvas id="webgl"></canvas>
 
+    <!-- Fast Mode Button -->
+    <button
+      id="fast-mode-btn"
+      style="
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%) scale(1);
+        z-index: 1000;
+        padding: 8px 16px;
+        background: rgba(0, 0, 0, 0.8);
+        color: #fff;
+        border: 1px solid rgba(255, 255, 255, 0.3);
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 13px;
+        backdrop-filter: blur(10px);
+        opacity: 1;
+        transition: all 0.3s ease;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
+          sans-serif;
+      "
+    >
+      Fast Mode
+    </button>
+
+    <!-- Fast Mode Overlay -->
+    <div
+      id="fast-mode"
+      style="
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: white;
+        z-index: 999;
+        overflow-y: auto;
+        padding: 20px;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
+          sans-serif;
+      "
+    >
+      <h1 style="color: #333; margin-bottom: 30px">Portfolio - Fast Mode</h1>
+      <section id="fast-about" style="margin-bottom: 40px">
+        <h2 style="color: #007aff">About Me</h2>
+        <p>
+          Hi, I'm Eddie. This is a macOS-inspired interactive portfolio. Explore
+          the other sections to learn more.
+        </p>
+      </section>
+      <section id="fast-projects" style="margin-bottom: 40px">
+        <h2 style="color: #007aff">Projects</h2>
+        <p>Some highlighted works:</p>
+        <ul>
+          <li>Project A – WebGL experiment.</li>
+          <li>Project B – Full-stack application.</li>
+          <li>Project C – Data visualization.</li>
+        </ul>
+      </section>
+      <section id="fast-skills" style="margin-bottom: 40px">
+        <h2 style="color: #007aff">Skills</h2>
+        <h3>Languages</h3>
+        <ul>
+          <li>JavaScript / TypeScript</li>
+          <li>Python</li>
+          <li>Go</li>
+        </ul>
+        <h3>Frameworks</h3>
+        <ul>
+          <li>React</li>
+          <li>Three.js</li>
+          <li>Node.js</li>
+        </ul>
+      </section>
+      <section id="fast-contact" style="margin-bottom: 40px">
+        <h2 style="color: #007aff">Contact</h2>
+        <p>Feel free to reach out:</p>
+        <ul>
+          <li>
+            Email: <a href="mailto:eddie@example.com">eddie@example.com</a>
+          </li>
+          <li>
+            GitHub:
+            <a href="https://github.com/B-Eddie" target="_blank" rel="noopener"
+              >B-Eddie</a
+            >
+          </li>
+        </ul>
+      </section>
+      <section id="fast-resume" style="margin-bottom: 40px">
+        <h2 style="color: #007aff">Résumé</h2>
+        <p>A concise overview:</p>
+        <ul>
+          <li>Experience at Company X</li>
+          <li>Open-source contributions</li>
+          <li>Continuous learner</li>
+        </ul>
+        <p>Download full résumé (coming soon).</p>
+      </section>
+      <button
+        id="exit-fast-mode"
+        style="
+          margin-top: 20px;
+          padding: 10px 20px;
+          background: #ff3b30;
+          color: white;
+          border: none;
+          border-radius: 5px;
+          cursor: pointer;
+          font-size: 14px;
+        "
+      >
+        Exit Fast Mode
+      </button>
+    </div>
+
     <!-- External Libraries -->
     <script type="importmap">
       {

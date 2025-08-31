@@ -97,7 +97,6 @@ export class SceneManager {
   }
 
   render() {
-    // Add debug helpers once (call-safe)
     this.renderer.render(this.scene, this.camera);
   }
 }
