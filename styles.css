@@ -1,3 +1,14 @@
+.mac-window[data-app-id="resume"] .content {
+  padding: 0;
+  background: #ffffff;
+}
+.mac-window[data-app-id="contact"] .content {
+  background: #ffffff;
+  padding-bottom: 16px; /* ensure comfortable space at bottom */
+  display: flex;
+  flex-direction: column;
+  overflow: hidden; /* let inner columns handle scrolling */
+}
 /* Reset and base styles */
 * {
   margin: 0;
@@ -148,6 +159,52 @@ canvas {
   gap: 42px 60px;
 }
 
+#mac-dock {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 12px;
+  margin: 0 auto;
+  display: none; /* toggle when items present */
+  justify-content: center;
+  gap: 10px;
+  z-index: 12000;
+  padding: 6px 10px;
+  background: rgba(20, 22, 28, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  backdrop-filter: blur(12px) saturate(140%);
+}
+
+#mac-dock .dock-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #e5e7eb;
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.12s ease, background 0.12s ease;
+}
+#mac-dock .dock-item:hover {
+  background: rgba(255, 255, 255, 0.12);
+  transform: translateY(-2px) scale(1.05);
+}
+#mac-dock .dock-item .dock-icon img {
+  width: 18px;
+  height: 18px;
+  display: block;
+}
+
+/* Add more space at bottom when dock is visible */
+#mac-desktop-root.has-dock #mac-desktop-area {
+  padding-bottom: 84px;
+}
+
 .mac-icon {
   width: 128px; /* much larger container width for bigger icons */
   text-align: center;
@@ -249,7 +306,7 @@ canvas {
     rgba(255, 255, 255, 0)
   );
   user-select: none;
-  cursor: default;
+  cursor: grab;
 }
 .traffic-lights {
   display: flex;
@@ -262,6 +319,7 @@ canvas {
   display: block;
   position: relative;
   box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.55) inset, 0 1px 2px rgba(0, 0, 0, 0.7);
+  cursor: pointer;
 }
 .traffic-lights .close {
   background: #ff5f56;
@@ -281,7 +339,7 @@ canvas {
 
 .mac-window .content {
   flex: 1;
-  padding: 20px 0 28px;
+  padding: 20px 0 0; /* default content padding */
   overflow-y: auto;
   font-size: 14px;
   line-height: 1.5;
@@ -290,6 +348,145 @@ canvas {
   scrollbar-width: thin;
   outline: none; /* Remove default focus outline */
 }
+
+/* Terminal (Skills) window: force white background */
+.mac-window[data-app-id="skills"] .content {
+  background: #ffffff;
+  color: #000000;
+  padding: 0; /* let terminal container own spacing */
+  overflow: hidden; /* avoid double scrollbars; inner terminal scrolls */
+}
+
+/* About window styles */
+.mac-window .content .about-root {
+  background: rgb(48, 48, 48);
+  color: #e5e7eb;
+  /* Create a visible gap on all sides inside the window content */
+  margin: 14px 18px 18px 18px;
+  border-radius: 12px;
+  /* Account for margins so content can still stretch vertically when window grows */
+  min-height: calc(100% - 32px);
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display",
+    "SF Pro Text", system-ui, sans-serif;
+}
+.mac-window[data-app-id="about"] .content {
+  padding-top: 0;
+  background: rgb(48, 48, 48);
+}
+.mac-window .content .about-section {
+  display: block;
+}
+.mac-window .content .about-hero h1 {
+  font-size: 26px;
+  margin: 0 0 6px;
+  letter-spacing: -0.02em;
+  color: #f3f4f6;
+}
+.mac-window .content .about-hero p {
+  color: #9aa3b2;
+}
+.mac-window .content .about-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+  margin-bottom: 24px;
+}
+.mac-window .content .card {
+  background: #171a21;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 14px;
+  padding: 18px;
+}
+.mac-window .content .card-icon {
+  width: 36px;
+  height: 36px;
+  background: #2a3242;
+  color: #e6edf7;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 10px;
+  font-size: 18px;
+}
+.mac-window .content .card h3 {
+  margin: 0 0 6px;
+  color: #e5e7eb;
+  font-size: 16px;
+}
+.mac-window .content .card p {
+  margin: 0;
+  color: #a7b0bf;
+  font-size: 13px;
+}
+.mac-window .content .panel {
+  background: #141821;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 14px;
+  padding: 18px;
+}
+.mac-window .content .panel h3 {
+  color: #e5e7eb;
+  margin: 0 0 8px;
+  font-size: 16px;
+}
+.mac-window .content .panel p,
+.mac-window .content .panel li {
+  color: #c5ccd8;
+}
+
+/* About split layout */
+.mac-window .content .about-split {
+  display: grid;
+  grid-template-columns: 1fr 2fr; /* left 1/3, right 2/3 */
+  gap: 22px;
+  align-items: start;
+}
+.mac-window .content .about-photo {
+  border: 1px solid rgb(71, 71, 71);
+  border-radius: 14px;
+  padding: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+}
+.mac-window .content .about-photo img {
+  width: 100%;
+  height: auto;
+  border-radius: 10px;
+  display: block;
+}
+.mac-window .content .about-details {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.mac-window .content .detail-row {
+  display: grid;
+  grid-template-columns: 140px 1fr;
+  gap: 12px;
+  align-items: start;
+  padding: 12px 14px;
+  border: 1px solid rgb(71, 71, 71);
+  border-radius: 10px;
+  background: transparent; /* border-only box */
+}
+.mac-window .content .detail-label {
+  color: #a7b0bf;
+  font-weight: 600;
+}
+.mac-window .content .detail-value {
+  color: #e5e7eb;
+}
+.mac-window .content .detail-value a {
+  color: #cbd6ff;
+  text-decoration: none;
+}
+.mac-window .content .detail-value a:hover {
+  text-decoration: underline;
+}
+
 .mac-window .content h2 {
   margin: 0 0 14px;
   font-size: 20px;
@@ -372,6 +569,28 @@ canvas {
   outline-offset: -2px;
 }
 
+/* show resize cursors near edges (invisible handles) */
+.mac-window {
+  position: absolute;
+}
+.mac-window:hover {
+  --edge: 10px;
+}
+.mac-window {
+  touch-action: none;
+}
+.mac-window::after {
+  content: "";
+  display: block;
+  width: 0;
+  height: 0;
+}
+
+/* cursors when hovering near edges handled via JS; provide default */
+.mac-window.resizing {
+  cursor: nwse-resize;
+}
+
 @media (max-width: 820px) {
   #mac-desktop-area {
     gap: 38px 40px;
@@ -390,5 +609,8 @@ canvas {
     width: 86px;
     height: 86px;
     margin: 0 auto 10px auto;
+  }
+  .mac-window .content .about-split {
+    grid-template-columns: 1fr;
   }
 }

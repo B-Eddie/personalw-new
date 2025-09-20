@@ -604,7 +604,6 @@ export class LaptopModel {
         ctx.fillStyle = "#bbb";
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
-        ctx.fillText("Scroll to continue", w / 2, barY + 90);
         ctx.globalAlpha = 1;
       }
     }
