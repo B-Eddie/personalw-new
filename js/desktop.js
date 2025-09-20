@@ -1212,23 +1212,23 @@ Memory: ${Math.round(
               </div>
             </div>
             <div class="hand-notes">
-              <div class="note-card" style="left: 18%; top: 28%; --tilt: -3deg; --tilt-opposite: 3deg;" data-project="webgl">
-                <img class="note-img" src="assets/image.png" alt="WebGL Experiment preview" />
-                <div class="note-title">WebGL Experiment</div>
-                <div class="note-body">Interactive shader toy and particle effects.</div>
-                <div class="note-desc">Built with Three.js and GLSL. Features custom shaders, post-processing, and user-controlled parameters. Click again to collapse.</div>
+              <div class="note-card" style="left: 18%; top: 28%; --tilt: -3deg; --tilt-opposite: 3deg;" data-project="Tangenai">
+                <img class="note-img" src="assets/tangenai.png" alt="Tangen AI preview" />
+                <div class="note-title">Tangen AI</div>
+                <div class="note-body"><a href="https://tangenai.work" target="_blank" rel="noopener noreferrer">tangenai.work</a></div>
+                <div class="note-desc">AI-powered stock scorer tool. Searches online for sentiment analysis and combines with key metrics.</div>
               </div>
-              <div class="note-card" style="left: 45%; top: 40%; --tilt: 2deg; --tilt-opposite: -2deg;" data-project="fullstack">
-                <img class="note-img" src="assets/icons/terminal.png" alt="Full-Stack App preview" />
-                <div class="note-title">Full-Stack App</div>
-                <div class="note-body">React + Node with real-time features.</div>
-                <div class="note-desc">End-to-end app with authentication, websockets, and a REST API. Deployed with CI/CD and containerized services.</div>
-              </div>
-              <div class="note-card" style="left: 68%; top: 24%; --tilt: -1.5deg; --tilt-opposite: 1.5deg;" data-project="dataviz">
-                <img class="note-img" src="assets/icons/arc.png" alt="Data Viz preview" />
-                <div class="note-title">Data Viz</div>
-                <div class="note-body">D3/Plotly dashboards for insights.</div>
-                <div class="note-desc">Interactive charts with tooltips, zooming, and filters. Optimized rendering for large datasets and responsive layouts.</div>
+              <div class="note-card" style="left: 45%; top: 40%; --tilt: 2deg; --tilt-opposite: -2deg;" data-project="ragnohacks">
+                <img class="note-img" src="assets/ragno.png" alt="RagnoHacks preview" />
+                <div class="note-title">RagnoHacks</div>
+                <div class="note-body"><a href="https://ragnohacks.ca/old" target="_blank" rel="noopener noreferrer">ragnohacks.ca</a></div>
+                <div class="note-desc">Hackathon website.</div>
+                </div>
+                <div class="note-card" style="left: 68%; top: 24%; --tilt: -1.5deg; --tilt-opposite: 1.5deg;" data-project="healthhub">
+                <img class="note-img" src="assets/fblc.png" alt="HealthHub preview" />
+                <div class="note-title">HealthHub</div>
+                <div class="note-body"><a href="https://github.com/B-Eddie/fblc" target="_blank" rel="noopener noreferrer">github.com/B-Eddie/fblc</a></div>
+                <div class="note-desc">Provider app that allows online booking for services.</div>
               </div>
             </div>
           `;
@@ -1257,6 +1257,8 @@ Memory: ${Math.round(
             card.addEventListener("click", (e) => {
               // Ignore clicks on header buttons
               if (e.target.closest("#projects-overlay-back")) return;
+              // Allow anchor clicks without toggling the card
+              if (e.target.closest("a")) return;
               cards.forEach((c) => {
                 if (c !== card) c.classList.remove("open");
               });
