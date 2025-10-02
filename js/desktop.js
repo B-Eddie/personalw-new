@@ -317,7 +317,7 @@ class MacDesktop {
                     <h3 style="font-size: 16px; font-weight: 600; color: #1d1d1f; margin: 0 0 12px 0;">Email</h3>
                     <div style="display: flex; align-items: center; gap: 8px; padding: 8px 0;">
                       <span style="font-size: 14px; color: #86868b;">work</span>
-                      <a href="mailto:eddie@example.com" style="font-size: 14px; color: #007aff; text-decoration: none;">eddie@example.com</a>
+                      <a href="mailto:eddie.bian@yahoo.com" style="font-size: 14px; color: #007aff; text-decoration: none;">eddie.bian@yahoo.com</a>
                     </div>
                   </div>
                   
@@ -329,16 +329,16 @@ class MacDesktop {
                     </div>
                     <div style="display: flex; align-items: center; gap: 8px; padding: 8px 0;">
                       <span style="font-size: 14px; color: #86868b;">LinkedIn</span>
-                      <a href="#" style="font-size: 14px; color: #007aff; text-decoration: none;">Eddie Smith</a>
+                      <a href="#" style="font-size: 14px; color: #007aff; text-decoration: none;">Eddie Bian</a>
                     </div>
                   </div>
                   
                   <div>
-                    <h3 style="font-size: 16px; font-weight: 600; color: #1d1d1f; margin: 0 0 12px 0;">Address</h3>
+                    <h3 style="font-size: 16px; font-weight: 600; color: #1d1d1f; margin: 0 0 12px 0;">School</h3>
                     <div style="font-size: 14px; color: #1d1d1f; line-height: 1.4;">
                       White Oaks Secondary School<br>
-                      1330 Rebecca St<br>
-                      Oakville, ON L6L 1Z7
+                      1330 Montclair Dr<br>
+                      Oakville, ON L6H 1Z5
                     </div>
                   </div>
                 </div>
