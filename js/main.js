@@ -37,6 +37,11 @@ class App {
             this.sceneManager,
             this.laptopModel
           );
+          // Hide loading overlay once model is loaded
+          const loading = document.getElementById("loading");
+          if (loading) {
+            loading.style.display = "none";
+          }
         });
       }
 
