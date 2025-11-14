@@ -1566,11 +1566,39 @@ document.addEventListener("DOMContentLoaded", () => {
   const fastBtn = document.getElementById("fast-mode-btn");
   const fastMode = document.getElementById("fast-mode");
   const exitBtn = document.getElementById("exit-fast-mode");
+  const scrollIndicator = document.getElementById(
+    "fast-mode-scroll-indicator"
+  );
+
+  const showIndicator = () => {
+    if (!scrollIndicator) return;
+    scrollIndicator.style.display = "flex";
+    requestAnimationFrame(() => {
+      scrollIndicator.style.opacity = "1";
+      scrollIndicator.style.transform =
+        "translateX(-50%) translateY(0px)";
+    });
+  };
+
+  const hideIndicator = () => {
+    if (!scrollIndicator) return;
+    scrollIndicator.style.opacity = "0";
+    scrollIndicator.style.transform =
+      "translateX(-50%) translateY(20px)";
+    // Keep display none after transition
+    setTimeout(() => {
+      if (scrollIndicator.style.opacity === "0") {
+        scrollIndicator.style.display = "none";
+      }
+    }, 260);
+  };
 
   if (fastBtn && fastMode && exitBtn) {
     // Initially show the button
     fastBtn.style.opacity = "1";
     fastBtn.style.transform = "translate(-50%, -50%) scale(1)";
+    // Show scroll indicator immediately after load
+    showIndicator();
 
     fastBtn.addEventListener("click", () => {
       fastMode.style.display = "block";
@@ -1578,6 +1606,7 @@ document.addEventListener("DOMContentLoaded", () => {
       // Hide the button after clicking
       fastBtn.style.opacity = "0";
       fastBtn.style.transform = "translate(-50%, -50%) scale(0)";
+      hideIndicator();
     });
 
     exitBtn.addEventListener("click", () => {
@@ -1590,6 +1619,7 @@ document.addEventListener("DOMContentLoaded", () => {
       if (scrollProgress > 0.2 && scrollProgress < 0.9) {
         fastBtn.style.opacity = "1";
         fastBtn.style.transform = "translate(-50%, -50%) scale(1)";
+        showIndicator();
       }
     });
 
@@ -1619,8 +1649,10 @@ document.addEventListener("DOMContentLoaded", () => {
       console.log(scrollProgress);
       if (scrollProgress >= 0 && scrollProgress < 0.3) {
         showButton();
+        showIndicator();
       } else {
         hideButton();
+        hideIndicator();
       }
     });
   }
