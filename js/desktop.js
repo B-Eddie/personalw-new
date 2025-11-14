@@ -1566,25 +1566,21 @@ document.addEventListener("DOMContentLoaded", () => {
   const fastBtn = document.getElementById("fast-mode-btn");
   const fastMode = document.getElementById("fast-mode");
   const exitBtn = document.getElementById("exit-fast-mode");
-  const scrollIndicator = document.getElementById(
-    "fast-mode-scroll-indicator"
-  );
+  const scrollIndicator = document.getElementById("fast-mode-scroll-indicator");
 
   const showIndicator = () => {
     if (!scrollIndicator) return;
     scrollIndicator.style.display = "flex";
     requestAnimationFrame(() => {
       scrollIndicator.style.opacity = "1";
-      scrollIndicator.style.transform =
-        "translateX(-50%) translateY(0px)";
+      scrollIndicator.style.transform = "translateX(-50%) translateY(0px)";
     });
   };
 
   const hideIndicator = () => {
     if (!scrollIndicator) return;
     scrollIndicator.style.opacity = "0";
-    scrollIndicator.style.transform =
-      "translateX(-50%) translateY(20px)";
+    scrollIndicator.style.transform = "translateX(-50%) translateY(20px)";
     // Keep display none after transition
     setTimeout(() => {
       if (scrollIndicator.style.opacity === "0") {
