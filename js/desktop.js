@@ -13,7 +13,7 @@ class MacDesktop {
         requireBottomProximityPx: 220, // consider near bottom within a larger range
         unlockUpIntentPx: 300, // upward scroll intent needed to dismiss while frozen (increased)
       },
-      options
+      options,
     );
     this._root = null;
     this._visible = false;
@@ -486,10 +486,10 @@ class MacDesktop {
       } catch (err) {}
       // commit using the last computed desired positions (avoids parsing transforms)
       const finalLeft = Math.round(
-        drag.lastLeft != null ? drag.lastLeft : drag.startLeft
+        drag.lastLeft != null ? drag.lastLeft : drag.startLeft,
       );
       const finalTop = Math.round(
-        drag.lastTop != null ? drag.lastTop : drag.startTop
+        drag.lastTop != null ? drag.lastTop : drag.startTop,
       );
       // commit without visual jump: set inline left/top, force reflow, then remove transform
       win.style.left = finalLeft + "px";
@@ -806,7 +806,7 @@ class MacDesktop {
       const tiltX = (0.5 - y) * (maxTilt * 2);
       const tiltY = (x - 0.5) * (maxTilt * 2);
       img.style.transform = `rotateX(${tiltX.toFixed(
-        2
+        2,
       )}deg) rotateY(${tiltY.toFixed(2)}deg) translateZ(8px)`;
       img.style.boxShadow = "0 12px 28px rgba(0,0,0,0.35)";
     };
@@ -1009,7 +1009,9 @@ Shell: web-terminal
 Resolution: ${window.innerWidth}x${window.innerHeight}
 CPU: WebGL (simulated)
 Memory: ${Math.round(
-          performance.memory ? performance.memory.usedJSHeapSize / 1048576 : 128
+          performance.memory
+            ? performance.memory.usedJSHeapSize / 1048576
+            : 128,
         )}MB
           </pre>
         `;
@@ -1130,8 +1132,8 @@ Memory: ${Math.round(
         const runner = anim.moveDownThenEngulf
           ? "moveDownThenEngulf"
           : anim.zoomOutRotateAndZoomIn
-          ? "zoomOutRotateAndZoomIn"
-          : "zoomToNotebook";
+            ? "zoomOutRotateAndZoomIn"
+            : "zoomToNotebook";
         anim[runner](() => {
           const existing = document.getElementById("projects-overlay-panel");
           if (existing) existing.remove();
