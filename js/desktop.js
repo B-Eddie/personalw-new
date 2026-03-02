@@ -1198,6 +1198,7 @@ Memory: ${Math.round(
               #projects-overlay-panel .note-desc {
                 display: none; margin-top: 6px; font-size: 18px; line-height: 1.15; opacity: 0.95;
               }
+              #projects-overlay-panel .note-card:hover .note-desc { display: block; }
               #projects-overlay-panel .note-card.open { box-shadow: 6px 6px 0 rgba(0,0,0,0.75); }
               #projects-overlay-panel .note-card.open .note-desc { display: block; }
               @media (max-width: 820px) {
@@ -1211,6 +1212,12 @@ Memory: ${Math.round(
               </div>
             </div>
             <div class="hand-notes">
+              <div class="note-card" style="left: 38%; top: 8%; --tilt: -4deg; --tilt-opposite: 4deg;" data-project="vertex">
+                <img class="note-img" src="assets/vertex.png" alt="Vertex preview" />
+                <div class="note-title">Vertex 🎓</div>
+                <div class="note-body"><a href="https://fblc-26.vercel.app/" target="_blank" rel="noopener noreferrer">fblc-26.vercel.app</a></div>
+                <div class="note-desc">1st Place CNLC winner. Platform connecting high school students with volunteer opportunities. Features advanced filtering, real-time applications, rating systems, and hours tracking.</div>
+              </div>
               <div class="note-card" style="left: 18%; top: 28%; --tilt: -3deg; --tilt-opposite: 3deg;" data-project="Tangenai">
                 <img class="note-img" src="assets/tangenai.png" alt="Tangen AI preview" />
                 <div class="note-title">Tangen AI</div>
