@@ -309,7 +309,7 @@ class MacDesktop {
                     <h3 style="font-size: 16px; font-weight: 600; color: #1d1d1f; margin: 0 0 12px 0;">Phone</h3>
                     <div style="display: flex; align-items: center; gap: 8px; padding: 8px 0;">
                       <span style="font-size: 14px; color: #86868b;">mobile</span>
-                      <span style="font-size: 14px; color: #1d1d1f;">+1 (555) 123-4567</span>
+                      <span style="font-size: 14px; color: #1d1d1f;">+1 (905) 805-8967</span>
                     </div>
                   </div>
                   
@@ -329,7 +329,7 @@ class MacDesktop {
                     </div>
                     <div style="display: flex; align-items: center; gap: 8px; padding: 8px 0;">
                       <span style="font-size: 14px; color: #86868b;">LinkedIn</span>
-                      <a href="#" style="font-size: 14px; color: #007aff; text-decoration: none;">Eddie Bian</a>
+                      <a href="https://www.linkedin.com/in/eddiebian/" target="_blank" rel="noopener" style="font-size: 14px; color: #007aff; text-decoration: none;">Eddie Bian</a>
                     </div>
                   </div>
                   
@@ -933,7 +933,6 @@ class MacDesktop {
           <div style="color: #6f42c1; font-weight: 600; margin-bottom: 8px;">Programming Languages:</div>
           <div style="margin-left: 16px; margin-bottom: 4px;">• JavaScript / TypeScript</div>
           <div style="margin-left: 16px; margin-bottom: 4px;">• Python</div>
-          <div style="margin-left: 16px; margin-bottom: 8px;">• Go</div>
           <div style="color: #6f42c1; font-weight: 600; margin-bottom: 8px;">Frameworks & Libraries:</div>
           <div style="margin-left: 16px; margin-bottom: 4px;">• React / Next.js</div>
           <div style="margin-left: 16px; margin-bottom: 4px;">• Three.js / WebGL</div>
