@@ -158,7 +158,7 @@ git push origin main
 
 ## 📄 License
 
-© 2024 Eddie Bian. All rights reserved.
+© 2026 Eddie Bian. All rights reserved.
 
 ---
 
