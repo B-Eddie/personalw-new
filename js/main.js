@@ -35,7 +35,7 @@ class App {
         this.laptopModel.ready.then(() => {
           this.animationManager = new AnimationManager(
             this.sceneManager,
-            this.laptopModel
+            this.laptopModel,
           );
           // Hide loading overlay once model is loaded
           const loading = document.getElementById("loading");

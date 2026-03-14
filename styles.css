@@ -20,7 +20,8 @@ body,
 html {
   margin: 0;
   height: 400vh; /* Long page for scrolling */
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-family:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   overflow-x: hidden;
 }
 
@@ -42,8 +43,9 @@ canvas {
   flex-direction: column;
   opacity: 0;
   pointer-events: none; /* Enabled when visible via JS */
-  font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", Helvetica,
-    Arial, sans-serif;
+  font-family:
+    -apple-system, BlinkMacSystemFont, "Helvetica Neue", Helvetica, Arial,
+    sans-serif;
   /* Plain background image (tint & blur removed per request) */
   background: url("assets/totoro.png") center center / cover no-repeat fixed;
   backdrop-filter: none;
@@ -63,7 +65,8 @@ canvas {
   user-select: none;
   -webkit-font-smoothing: antialiased;
   letter-spacing: 0.1px;
-  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.05),
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.05),
     0 0 0 0.5px rgba(255, 255, 255, 0.08) inset,
     0 0 30px -8px rgba(0, 0, 0, 0.5);
 }
@@ -79,7 +82,9 @@ canvas {
   position: relative;
   padding: 2px 9px 3px;
   border-radius: 5px;
-  transition: background 0.18s ease, color 0.18s ease;
+  transition:
+    background 0.18s ease,
+    color 0.18s ease;
 }
 #mac-menubar .menu-item:hover {
   background: rgba(255, 255, 255, 0.15);
@@ -107,7 +112,8 @@ canvas {
   backdrop-filter: blur(30px) saturate(180%);
   border-radius: 10px;
   padding: 6px 0;
-  box-shadow: 0 20px 40px -14px rgba(0, 0, 0, 0.65),
+  box-shadow:
+    0 20px 40px -14px rgba(0, 0, 0, 0.65),
     0 0 0 0.5px rgba(255, 255, 255, 0.08) inset;
   border: 1px solid rgba(255, 255, 255, 0.06);
   display: none;
@@ -188,7 +194,9 @@ canvas {
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
-  transition: transform 0.12s ease, background 0.12s ease;
+  transition:
+    transform 0.12s ease,
+    background 0.12s ease;
 }
 #mac-dock .dock-item:hover {
   background: rgba(255, 255, 255, 0.12);
@@ -240,7 +248,9 @@ canvas {
   font-size: 11px;
   padding: 4px 8px;
   border-radius: 8px;
-  transition: opacity 0.22s ease, transform 0.15s ease;
+  transition:
+    opacity 0.22s ease,
+    transform 0.15s ease;
   pointer-events: none;
 }
 .selected .label-bg {
@@ -275,13 +285,16 @@ canvas {
   background: rgba(19, 21, 26, 0.82);
   backdrop-filter: blur(30px) saturate(170%);
   border-radius: 14px;
-  box-shadow: 0 18px 40px -10px rgba(0, 0, 0, 0.7),
+  box-shadow:
+    0 18px 40px -10px rgba(0, 0, 0, 0.7),
     0 0 0 0.5px rgba(255, 255, 255, 0.15) inset;
   display: flex;
   flex-direction: column;
   opacity: 0;
   transform: scale(0.96) translateY(12px);
-  transition: opacity 0.35s ease, transform 0.35s cubic-bezier(0.4, 0.8, 0.2, 1);
+  transition:
+    opacity 0.35s ease,
+    transform 0.35s cubic-bezier(0.4, 0.8, 0.2, 1);
   overflow: hidden;
 }
 .mac-window.visible {
@@ -289,7 +302,8 @@ canvas {
   transform: scale(1) translateY(0);
 }
 .mac-window.active {
-  box-shadow: 0 22px 50px -12px rgba(0, 0, 0, 0.75),
+  box-shadow:
+    0 22px 50px -12px rgba(0, 0, 0, 0.75),
     0 0 0 0.5px rgba(255, 255, 255, 0.25) inset;
 }
 
@@ -318,7 +332,9 @@ canvas {
   border-radius: 50%;
   display: block;
   position: relative;
-  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.55) inset, 0 1px 2px rgba(0, 0, 0, 0.7);
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.55) inset,
+    0 1px 2px rgba(0, 0, 0, 0.7);
   cursor: pointer;
 }
 .traffic-lights .close {
@@ -366,8 +382,9 @@ canvas {
   border-radius: 12px;
   /* Account for margins so content can still stretch vertically when window grows */
   min-height: calc(100% - 32px);
-  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display",
-    "SF Pro Text", system-ui, sans-serif;
+  font-family:
+    -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text",
+    system-ui, sans-serif;
 }
 .mac-window[data-app-id="about"] .content {
   padding-top: 0;
@@ -514,7 +531,8 @@ canvas {
 .mac-window {
   border-radius: 16px;
   background: rgba(22, 24, 28, 0.78);
-  box-shadow: 0 28px 70px -24px rgba(0, 0, 0, 0.85),
+  box-shadow:
+    0 28px 70px -24px rgba(0, 0, 0, 0.85),
     0 0 0 0.6px rgba(255, 255, 255, 0.14) inset;
 }
 .mac-window .titlebar {
@@ -527,7 +545,9 @@ canvas {
   padding: 0 14px;
 }
 .traffic-lights span {
-  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.55) inset, 0 1px 2px rgba(0, 0, 0, 0.75),
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.55) inset,
+    0 1px 2px rgba(0, 0, 0, 0.75),
     0 0 4px rgba(0, 0, 0, 0.6);
 }
 .traffic-lights span::after {
@@ -544,7 +564,8 @@ canvas {
   pointer-events: none;
 }
 .mac-window.active {
-  box-shadow: 0 34px 90px -30px rgba(0, 0, 0, 0.9),
+  box-shadow:
+    0 34px 90px -30px rgba(0, 0, 0, 0.9),
     0 0 0 0.8px rgba(255, 255, 255, 0.25) inset;
 }
 .mac-window.zoomed {
@@ -817,7 +838,8 @@ canvas {
   color: #fff;
   font-size: 18px;
   margin-top: 20px;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-family:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   border-right: 2px solid #007aff;
   animation: blink-caret 0.75s step-end infinite;
   white-space: nowrap;
