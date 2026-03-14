@@ -11,6 +11,11 @@ export class SceneManager {
     this.camera = null;
     this.renderer = null;
     this.lights = {};
+    this.isConstrainedDevice =
+      window.matchMedia("(max-width: 900px)").matches ||
+      (navigator.hardwareConcurrency && navigator.hardwareConcurrency <= 4);
+    this.pixelRatioCap = this.isConstrainedDevice ? 1 : 1.5;
+    this.shadowsEnabled = !this.isConstrainedDevice;
 
     this.init();
   }
@@ -40,16 +45,18 @@ export class SceneManager {
   setupRenderer() {
     this.renderer = new THREE.WebGLRenderer({
       canvas: this.canvas,
-      antialias: true,
+      antialias: !this.isConstrainedDevice,
       alpha: true,
       powerPreference: "high-performance",
     });
     this.renderer.setSize(window.innerWidth, window.innerHeight);
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, this.pixelRatioCap));
     this.renderer.setClearColor(0x20232a, 1);
-    // Improved lighting/shadows
-    this.renderer.shadowMap.enabled = true;
-    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    // Keep initial GPU cost lower on constrained devices.
+    this.renderer.shadowMap.enabled = this.shadowsEnabled;
+    this.renderer.shadowMap.type = this.isConstrainedDevice
+      ? THREE.PCFShadowMap
+      : THREE.PCFSoftShadowMap;
     // Use new color space property for three.js v0.152+
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     if (this.renderer.toneMappingExposure !== undefined)
@@ -60,8 +67,11 @@ export class SceneManager {
     // Key light
     const key = new THREE.DirectionalLight(0xffffff, 1.4);
     key.position.set(4, 6, 5);
-    key.castShadow = true;
-    key.shadow.mapSize.set(1024, 1024);
+    key.castShadow = this.shadowsEnabled;
+    key.shadow.mapSize.set(
+      this.isConstrainedDevice ? 512 : 1024,
+      this.isConstrainedDevice ? 512 : 1024
+    );
     key.shadow.camera.near = 0.5;
     key.shadow.camera.far = 25;
     this.scene.add(key);
@@ -94,6 +104,7 @@ export class SceneManager {
     this.camera.aspect = window.innerWidth / window.innerHeight;
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(window.innerWidth, window.innerHeight);
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, this.pixelRatioCap));
   }
 
   render() {

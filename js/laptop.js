@@ -274,7 +274,8 @@ export class LaptopModel {
     if (!this.screen) return;
     // Prepare canvas
     const canvas = document.createElement("canvas");
-    canvas.width = 1024;
+    const isCompactViewport = window.matchMedia("(max-width: 900px)").matches;
+    canvas.width = isCompactViewport ? 512 : 768;
     // If we have a screen geometry aspect, use it (aspect = width/height)
     const aspect = this._screenGeomAspect || 1024 / 640; // fallback 16:10
     canvas.height = Math.round(canvas.width / aspect);
