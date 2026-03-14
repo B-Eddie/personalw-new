@@ -31,7 +31,7 @@ export class SceneManager {
       35,
       window.innerWidth / window.innerHeight,
       0.1,
-      100
+      100,
     );
     const camCfg = CONFIG.camera || {};
     const p = camCfg.initialPosition || { x: 0, y: 6, z: 0.01 };
@@ -50,7 +50,9 @@ export class SceneManager {
       powerPreference: "high-performance",
     });
     this.renderer.setSize(window.innerWidth, window.innerHeight);
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, this.pixelRatioCap));
+    this.renderer.setPixelRatio(
+      Math.min(window.devicePixelRatio, this.pixelRatioCap),
+    );
     this.renderer.setClearColor(0x20232a, 1);
     // Keep initial GPU cost lower on constrained devices.
     this.renderer.shadowMap.enabled = this.shadowsEnabled;
@@ -70,7 +72,7 @@ export class SceneManager {
     key.castShadow = this.shadowsEnabled;
     key.shadow.mapSize.set(
       this.isConstrainedDevice ? 512 : 1024,
-      this.isConstrainedDevice ? 512 : 1024
+      this.isConstrainedDevice ? 512 : 1024,
     );
     key.shadow.camera.near = 0.5;
     key.shadow.camera.far = 25;
@@ -104,7 +106,9 @@ export class SceneManager {
     this.camera.aspect = window.innerWidth / window.innerHeight;
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(window.innerWidth, window.innerHeight);
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, this.pixelRatioCap));
+    this.renderer.setPixelRatio(
+      Math.min(window.devicePixelRatio, this.pixelRatioCap),
+    );
   }
 
   render() {

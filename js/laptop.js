@@ -50,7 +50,7 @@ export class LaptopModel {
       "models/laptop.glb",
       (gltf) => this._onModelLoaded(gltf.scene),
       undefined,
-      (err) => console.error("Failed to load models/laptop.glb", err)
+      (err) => console.error("Failed to load models/laptop.glb", err),
     );
   }
 
@@ -232,7 +232,7 @@ export class LaptopModel {
 
         const candidateMeshes = [];
         this.screen.traverse(
-          (child) => child.isMesh && candidateMeshes.push(child)
+          (child) => child.isMesh && candidateMeshes.push(child),
         );
 
         let matches = 0;
@@ -255,17 +255,17 @@ export class LaptopModel {
             mesh.material.needsUpdate = true;
           });
           console.warn(
-            `[LaptopModel] Target material '${targetMaterialName}' not found (meshes: ${candidateMeshes.length}). Applied fallback to all.`
+            `[LaptopModel] Target material '${targetMaterialName}' not found (meshes: ${candidateMeshes.length}). Applied fallback to all.`,
           );
         } else {
           console.log(
-            `[LaptopModel] Applied texture to ${matches} mesh(es) with material '${targetMaterialName}'.`
+            `[LaptopModel] Applied texture to ${matches} mesh(es) with material '${targetMaterialName}'.`,
           );
         }
       },
       undefined,
       (err) =>
-        console.error("[LaptopModel] Failed to load texture", imagePath, err)
+        console.error("[LaptopModel] Failed to load texture", imagePath, err),
     );
   }
 
@@ -317,11 +317,11 @@ export class LaptopModel {
         this._screenMaterialTargets.push(mesh.material);
       });
       console.warn(
-        `[LaptopModel] Boot screen: target material '${targetMaterialName}' not found; applied fallback.`
+        `[LaptopModel] Boot screen: target material '${targetMaterialName}' not found; applied fallback.`,
       );
     } else {
       console.log(
-        `[LaptopModel] Boot screen dynamic texture applied to ${applied} mesh(es).`
+        `[LaptopModel] Boot screen dynamic texture applied to ${applied} mesh(es).`,
       );
     }
   }
@@ -559,7 +559,7 @@ export class LaptopModel {
           w / 2 - placeholderSize / 2,
           h / 2 - 60 - placeholderSize / 2,
           placeholderSize,
-          placeholderSize
+          placeholderSize,
         );
         ctx.restore();
       }
@@ -591,7 +591,7 @@ export class LaptopModel {
           fillWFull,
           barHeight,
           fillRadius,
-          true
+          true,
         );
         ctx.fillStyle = "white";
         ctx.fill();
