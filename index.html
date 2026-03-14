@@ -202,6 +202,47 @@
         Exit Fast Mode
       </button>
 
+      <div
+        id="fast-mode-ready-notice"
+        style="
+          display: none;
+          position: fixed;
+          left: 50%;
+          bottom: max(18px, env(safe-area-inset-bottom));
+          transform: translateX(-50%) translateY(16px);
+          opacity: 0;
+          z-index: 1150;
+          align-items: center;
+          gap: 12px;
+          background: rgba(14, 18, 16, 0.88);
+          border: 1px solid rgba(204, 88, 51, 0.45);
+          border-radius: 999px;
+          padding: 10px 12px 10px 16px;
+          color: #f2f0e9;
+          font-size: 13px;
+          backdrop-filter: blur(10px);
+          transition: opacity 0.25s ease, transform 0.25s ease;
+        "
+      >
+        <span>3D view is ready.</span>
+        <button
+          id="fast-mode-back-to-3d"
+          style="
+            border: 1px solid rgba(204, 88, 51, 0.6);
+            background: rgba(204, 88, 51, 0.2);
+            color: #f2f0e9;
+            border-radius: 999px;
+            padding: 6px 12px;
+            font-size: 12px;
+            font-weight: 700;
+            letter-spacing: 0.02em;
+            cursor: pointer;
+          "
+        >
+          Go back to 3D
+        </button>
+      </div>
+
       <!-- Header -->
       <div
         style="
@@ -1416,6 +1457,7 @@
             Download Full Résumé
           </a>
         </section>
+
       </div>
     </div>
 

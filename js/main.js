@@ -42,6 +42,7 @@ class App {
           if (loading) {
             loading.style.display = "none";
             document.body.classList.remove("is-loading");
+            window.dispatchEvent(new Event("app-models-loaded"));
           }
         });
       }

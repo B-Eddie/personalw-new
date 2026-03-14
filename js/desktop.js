@@ -1575,6 +1575,8 @@ document.addEventListener("DOMContentLoaded", () => {
   const fastMode = document.getElementById("fast-mode");
   const exitBtn = document.getElementById("exit-fast-mode");
   const scrollIndicator = document.getElementById("fast-mode-scroll-indicator");
+  const readyNotice = document.getElementById("fast-mode-ready-notice");
+  const backTo3DBtn = document.getElementById("fast-mode-back-to-3d");
 
   const showIndicator = () => {
     if (!scrollIndicator) return;
@@ -1598,24 +1600,34 @@ document.addEventListener("DOMContentLoaded", () => {
   };
 
   if (fastBtn && fastMode && exitBtn) {
-    // Initially show the button
-    fastBtn.style.opacity = "1";
-    fastBtn.style.transform = "translate(-50%, -50%) scale(1)";
-    // Show scroll indicator immediately after load
-    showIndicator();
+    let modelsLoaded = !document.body.classList.contains("is-loading");
 
-    fastBtn.addEventListener("click", () => {
-      fastMode.style.display = "block";
-      document.body.style.overflow = "hidden"; // Prevent background scroll
-      // Hide the button after clicking
-      fastBtn.style.opacity = "0";
-      fastBtn.style.transform = "translate(-50%, -50%) scale(0)";
-      hideIndicator();
-    });
+    const showReadyNotice = () => {
+      if (!readyNotice) return;
+      readyNotice.style.display = "inline-flex";
+      requestAnimationFrame(() => {
+        readyNotice.style.opacity = "1";
+        readyNotice.style.transform = "translateX(-50%) translateY(0px)";
+      });
+    };
 
-    exitBtn.addEventListener("click", () => {
+    const hideReadyNotice = () => {
+      if (!readyNotice) return;
+      readyNotice.style.opacity = "0";
+      readyNotice.style.transform = "translateX(-50%) translateY(16px)";
+      setTimeout(() => {
+        if (readyNotice.style.opacity === "0") {
+          readyNotice.style.display = "none";
+        }
+      }, 260);
+    };
+
+    const closeFastMode = () => {
       fastMode.style.display = "none";
       document.body.style.overflow = "auto";
+      document.body.classList.remove("fast-mode-open");
+      hideReadyNotice();
+
       // Show the button again when exiting fast mode
       const scrollProgress =
         window.scrollY /
@@ -1625,7 +1637,42 @@ document.addEventListener("DOMContentLoaded", () => {
         fastBtn.style.transform = "translate(-50%, -50%) scale(1)";
         showIndicator();
       }
+    };
+
+    window.addEventListener("app-models-loaded", () => {
+      modelsLoaded = true;
+      if (fastMode.style.display === "block") {
+        showReadyNotice();
+      }
     });
+
+    // Initially show the button
+    fastBtn.style.opacity = "1";
+    fastBtn.style.transform = "translate(-50%, -50%) scale(1)";
+    // Show scroll indicator immediately after load
+    showIndicator();
+
+    fastBtn.addEventListener("click", () => {
+      fastMode.style.display = "block";
+      document.body.style.overflow = "hidden"; // Prevent background scroll
+      document.body.classList.add("fast-mode-open");
+      // Hide the button after clicking
+      fastBtn.style.opacity = "0";
+      fastBtn.style.transform = "translate(-50%, -50%) scale(0)";
+      hideIndicator();
+
+      if (modelsLoaded) {
+        showReadyNotice();
+      } else {
+        hideReadyNotice();
+      }
+    });
+
+    exitBtn.addEventListener("click", closeFastMode);
+
+    if (backTo3DBtn) {
+      backTo3DBtn.addEventListener("click", closeFastMode);
+    }
 
     // Show/hide button based on scroll progress
     let buttonVisible = true; // Start as visible

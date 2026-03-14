@@ -877,10 +877,15 @@ canvas {
 }
 
 /* Keep Fast Mode visible while the loading overlay is shown. */
-body.is-loading #fast-mode-btn {
+body.is-loading:not(.fast-mode-open) #fast-mode-btn {
   top: auto !important;
   bottom: max(20px, env(safe-area-inset-bottom));
   left: 50% !important;
   transform: translateX(-50%) scale(1) !important;
   z-index: 10001 !important;
+}
+
+/* If user opens Fast Mode before models finish, keep it above loader. */
+body.is-loading #fast-mode {
+  z-index: 10002 !important;
 }
