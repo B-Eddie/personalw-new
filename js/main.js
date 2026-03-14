@@ -41,6 +41,7 @@ class App {
           const loading = document.getElementById("loading");
           if (loading) {
             loading.style.display = "none";
+            document.body.classList.remove("is-loading");
           }
         });
       }

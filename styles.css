@@ -853,3 +853,12 @@ canvas {
     border-color: #007aff;
   }
 }
+
+/* Keep Fast Mode visible while the loading overlay is shown. */
+body.is-loading #fast-mode-btn {
+  top: auto !important;
+  bottom: max(20px, env(safe-area-inset-bottom));
+  left: 50% !important;
+  transform: translateX(-50%) scale(1) !important;
+  z-index: 10001 !important;
+}

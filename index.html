@@ -8,7 +8,7 @@
     <link rel="icon" type="image/png" href="assets/image.png" />
     <link rel="apple-touch-icon" href="assets/image.png" />
   </head>
-  <body>
+  <body class="is-loading">
     <!-- Loading Overlay -->
     <div
       id="loading"
@@ -89,7 +89,7 @@
         top: 50%;
         left: 50%;
         transform: translate(-50%, -50%) scale(1);
-        z-index: 1000;
+        z-index: 10001;
         padding: 8px 16px;
         background: rgba(0, 0, 0, 0.8);
         color: #fff;
@@ -170,6 +170,38 @@
           sans-serif;
       "
     >
+      <button
+        id="exit-fast-mode"
+        style="
+          position: fixed;
+          top: max(16px, env(safe-area-inset-top));
+          right: 16px;
+          z-index: 1100;
+          background: rgba(255, 255, 255, 0.12);
+          color: #f2f0e9;
+          border: 1px solid rgba(204, 88, 51, 0.35);
+          border-radius: 999px;
+          padding: 10px 16px;
+          cursor: pointer;
+          font-size: 12px;
+          font-weight: 700;
+          transition: all 0.25s ease;
+          text-transform: uppercase;
+          letter-spacing: 0.08em;
+          backdrop-filter: blur(8px);
+        "
+        onmouseover="
+          this.style.background = 'rgba(204, 88, 51, 0.24)';
+          this.style.borderColor = 'rgba(204, 88, 51, 0.7)';
+        "
+        onmouseout="
+          this.style.background = 'rgba(255, 255, 255, 0.12)';
+          this.style.borderColor = 'rgba(204, 88, 51, 0.35)';
+        "
+      >
+        Exit Fast Mode
+      </button>
+
       <!-- Header -->
       <div
         style="
@@ -1385,35 +1417,6 @@
           </a>
         </section>
 
-        <!-- Exit Button -->
-        <div style="padding: 0 0 40px 0; text-align: center">
-          <button
-            id="exit-fast-mode"
-            style="
-              background: rgba(255, 255, 255, 0.1);
-              color: #f2f0e9;
-              border: 1px solid rgba(204, 88, 51, 0.3);
-              border-radius: 16px;
-              padding: 14px 32px;
-              cursor: pointer;
-              font-size: 14px;
-              font-weight: 600;
-              transition: all 0.3s ease;
-              text-transform: uppercase;
-              letter-spacing: 0.1em;
-            "
-            onmouseover="
-              this.style.background = 'rgba(204, 88, 51, 0.2)';
-              this.style.borderColor = 'rgba(204, 88, 51, 0.6)';
-            "
-            onmouseout="
-              this.style.background = 'rgba(255, 255, 255, 0.1)';
-              this.style.borderColor = 'rgba(204, 88, 51, 0.3)';
-            "
-          >
-            Exit Fast Mode
-          </button>
-        </div>
       </div>
     </div>
 
