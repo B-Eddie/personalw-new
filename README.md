@@ -52,38 +52,6 @@ An interactive, immersive portfolio website featuring a 3D animated laptop model
 
 ---
 
-## 🚀 Getting Started
-
-### Prerequisites
-
-- Modern web browser with WebGL support
-- Local development server (for CORS compliance with ES6 modules)
-
-### Installation
-
-1. **Clone the repository**
-
-   ```bash
-   git clone https://github.com/[username]/personalw-new.git
-   cd personalw-new
-   ```
-
-2. **Start a local development server**
-
-   ```bash
-   python -m http.server 8000
-   # or
-   npx http-server
-   # or use your preferred local server
-   ```
-
-3. **Open in browser**
-   ```
-   http://localhost:8000
-   ```
-
----
-
 ## 🎭 Key Components
 
 ### SceneManager (`js/scene.js`)
@@ -115,22 +83,6 @@ Core settings can be customized in `js/config.js`:
 
 ---
 
-## 🎬 Development
-
-### Adding Animations
-
-Animations are managed through the `AnimationManager` class. Use GSAP timelines and ScrollTrigger for scroll-based effects.
-
-### Modifying 3D Model
-
-Update the `LaptopModel` class to load different models or adjust geometry and materials.
-
-### Styling
-
-Edit `styles.css` to customize colors, layouts, and responsive behavior.
-
----
-
 ## 📱 Browser Support
 
 - Chrome/Chromium (recommended for best performance)
@@ -144,15 +96,7 @@ Requires WebGL support and ES6 module compatibility.
 
 ## 🔗 Deployment
 
-The site is deployed to GitHub Pages using the custom domain **eddiebian.me**.
-
-To deploy your changes:
-
-```bash
-git add .
-git commit -m "Update portfolio"
-git push origin main
-```
+The site is hosted on GitHub Pages at the custom domain **eddiebian.me**.
 
 ---
 
