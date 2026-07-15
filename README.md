@@ -26,10 +26,8 @@ assets/            # images, icons, resume
 
 ## Running locally
 
-Just serve the folder — anything static works:
-
 ```bash
 npx serve .
 ```
 
-Then open the URL it prints.
+Then open the URL
