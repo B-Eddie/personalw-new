@@ -145,9 +145,45 @@ class MacDesktop {
         title: "Résumé",
       },
     ];
-    // Store for dock usage
     this._appMeta = Object.fromEntries(icons.map((i) => [i.id, i]));
-    icons.forEach((icon) => {
+    this._homePageIndex = 0;
+
+    const pages = document.createElement("div");
+    pages.className = "home-pages";
+    pages.id = "home-pages";
+
+    const page1 = document.createElement("div");
+    page1.className = "home-page active";
+    page1.dataset.page = "0";
+
+    const page2 = document.createElement("div");
+    page2.className = "home-page";
+    page2.dataset.page = "1";
+
+    const widgetHost1 = document.createElement("div");
+    widgetHost1.className = "home-widgets";
+    widgetHost1.innerHTML = this._widgetMarkup("page1");
+    page1.appendChild(widgetHost1);
+
+    const iconRow1 = document.createElement("div");
+    iconRow1.className = "home-icon-grid";
+    page1.appendChild(iconRow1);
+
+    const widgetHost2 = document.createElement("div");
+    widgetHost2.className = "home-widgets page2";
+    widgetHost2.innerHTML = this._widgetMarkup("page2");
+    page2.appendChild(widgetHost2);
+
+    const iconRow2 = document.createElement("div");
+    iconRow2.className = "home-icon-grid";
+    page2.appendChild(iconRow2);
+
+    // Page 1: About + Projects with feature widgets
+    // Page 2: Skills, Contact, Résumé with status widgets
+    const page1Ids = ["about", "projects"];
+    const page2Ids = ["skills", "contact", "resume"];
+
+    const mountIcon = (icon, host) => {
       const el = document.createElement("div");
       el.className = "mac-icon";
       el.tabIndex = 0;
@@ -165,8 +201,142 @@ class MacDesktop {
           this._handleIconClick(e, icon);
         }
       });
-      this._desktopArea.appendChild(el);
+      host.appendChild(el);
+    };
+
+    icons.forEach((icon) => {
+      if (page1Ids.includes(icon.id)) mountIcon(icon, iconRow1);
+      else if (page2Ids.includes(icon.id)) mountIcon(icon, iconRow2);
+      else mountIcon(icon, iconRow1);
     });
+
+    // Desktop also gets a dedicated desktop-widgets rail (visible on Mac)
+    const desktopWidgets = document.createElement("div");
+    desktopWidgets.className = "desktop-widgets";
+    desktopWidgets.innerHTML = this._widgetMarkup("desktop");
+
+    pages.appendChild(page1);
+    pages.appendChild(page2);
+    this._desktopArea.appendChild(desktopWidgets);
+    this._desktopArea.appendChild(pages);
+    this._pagesEl = pages;
+    this._bindHomePaging();
+    this._updateWidgetClock();
+  }
+
+  _widgetMarkup(scope) {
+    if (scope === "page1" || scope === "desktop") {
+      return `
+        <div class="glass-widget widget-featured" data-open="projects">
+          <div class="glass-widget-kicker">Featured</div>
+          <div class="glass-widget-title">Vertex</div>
+          <div class="glass-widget-body">1st Place CNLC · volunteer matching platform</div>
+        </div>
+        <div class="glass-widget widget-wins">
+          <div class="glass-widget-kicker">Highlights</div>
+          <div class="glass-widget-stat">1st</div>
+          <div class="glass-widget-body">FBLC National · Coding & Programming</div>
+        </div>
+        <div class="glass-widget widget-stack">
+          <div class="glass-widget-kicker">Stack</div>
+          <div class="glass-widget-chips">
+            <span>Python</span><span>JS</span><span>React</span><span>FastAPI</span>
+          </div>
+        </div>
+      `;
+    }
+    // page2
+    return `
+      <div class="glass-widget widget-clock">
+        <div class="glass-widget-kicker" id="widget-clock-date">Today</div>
+        <div class="glass-widget-stat" id="widget-clock-time">--:--</div>
+        <div class="glass-widget-body">Toronto</div>
+      </div>
+      <div class="glass-widget widget-status">
+        <div class="glass-widget-kicker">Status</div>
+        <div class="glass-widget-title">Building</div>
+        <div class="glass-widget-body">Hackathons · DECA · open to collab</div>
+      </div>
+      <div class="glass-widget widget-bio" data-open="about">
+        <div class="glass-widget-kicker">About</div>
+        <div class="glass-widget-body">IB student shipping full-stack tools and mentoring CS / Robotics.</div>
+      </div>
+    `;
+  }
+
+  _updateWidgetClock() {
+    const timeEl = this._root && this._root.querySelector("#widget-clock-time");
+    const dateEl = this._root && this._root.querySelector("#widget-clock-date");
+    const now = new Date();
+    if (timeEl) {
+      timeEl.textContent = now.toLocaleTimeString(undefined, {
+        hour: "numeric",
+        minute: "2-digit",
+      });
+    }
+    if (dateEl) {
+      dateEl.textContent = now.toLocaleDateString(undefined, {
+        weekday: "long",
+        month: "short",
+        day: "numeric",
+      });
+    }
+    setTimeout(() => this._updateWidgetClock(), 20000);
+  }
+
+  _bindHomePaging() {
+    const dots = this._root.querySelector(".ios-page-dots");
+    if (dots) {
+      dots.innerHTML = `<span data-page="0" class="active"></span><span data-page="1"></span>`;
+      dots.querySelectorAll("span").forEach((dot) => {
+        dot.addEventListener("click", () =>
+          this._setHomePage(Number(dot.dataset.page)),
+        );
+      });
+    }
+
+    // Widget taps open apps
+    this._desktopArea.querySelectorAll("[data-open]").forEach((el) => {
+      el.style.cursor = "pointer";
+      el.addEventListener("click", () => this._openAppWindow(el.dataset.open));
+    });
+
+    // Swipe between pages on the pages container
+    let startX = null;
+    let startY = null;
+    const onStart = (e) => {
+      const t = e.touches ? e.touches[0] : e;
+      startX = t.clientX;
+      startY = t.clientY;
+    };
+    const onEnd = (e) => {
+      if (startX == null) return;
+      const t = e.changedTouches ? e.changedTouches[0] : e;
+      const dx = t.clientX - startX;
+      const dy = t.clientY - startY;
+      startX = null;
+      startY = null;
+      if (Math.abs(dx) < 40 || Math.abs(dx) < Math.abs(dy)) return;
+      if (dx < 0) this._setHomePage(Math.min(1, this._homePageIndex + 1));
+      else this._setHomePage(Math.max(0, this._homePageIndex - 1));
+    };
+    if (this._pagesEl) {
+      this._pagesEl.addEventListener("touchstart", onStart, { passive: true });
+      this._pagesEl.addEventListener("touchend", onEnd, { passive: true });
+    }
+  }
+
+  _setHomePage(index) {
+    this._homePageIndex = index;
+    if (!this._pagesEl) return;
+    this._pagesEl.querySelectorAll(".home-page").forEach((p) => {
+      p.classList.toggle("active", Number(p.dataset.page) === index);
+    });
+    this._pagesEl.style.setProperty("--page", String(index));
+    const dots = this._root.querySelectorAll(".ios-page-dots span");
+    dots.forEach((d) =>
+      d.classList.toggle("active", Number(d.dataset.page) === index),
+    );
   }
 
   // Dock removed per user request; related handlers pruned.
@@ -274,40 +444,82 @@ class MacDesktop {
         return {
           title: "About Me",
           html: `
-            <div class="about-root">
-              <div class="about-sections">
-                <section id="about-section-eddie" class="about-section active" role="tabpanel" aria-labelledby="tab-eddie">
-                  <div class="about-split">
-                    <div class="about-photo">
-                      <img src="assets/image.png" alt="Eddie" />
-                    </div>
-                    <div class="about-details">
-                      <div class="detail-row">
-                        <div class="detail-label">Name</div>
-                        <div class="detail-value">Eddie</div>
-                      </div>
-                      <div class="detail-row">
-                        <div class="detail-label">Email</div>
-                        <div class="detail-value">email@gmail.com</div>
-                      </div>
-                      
-                      <div class="detail-row">
-                        <div class="detail-label">School</div>
-                        <div class="detail-value">IB Diploma Program</div>
-                      </div>
-                      <div class="detail-row">
-                        <div class="detail-label">Location</div>
-                        <div class="detail-value">Toronto, Ontario</div>
-                      </div>
-                      <div class="detail-row">
-                        <div class="detail-label">About</div>
-                        <div class="detail-value">I'm a Grade 11 IB student and developer who loves building. I love hackathons, sports, and exploring new technologies.</div>
-                      </div>
-                    </div>
+            <div class="arc-about">
+              <aside class="arc-sidebar" aria-label="Spaces">
+                <div class="arc-space active" data-space="profile">
+                  <span class="arc-space-dot" style="--arc: #ff5c8a"></span>
+                  <span>Profile</span>
+                </div>
+                <div class="arc-space" data-space="stack">
+                  <span class="arc-space-dot" style="--arc: #7c5cff"></span>
+                  <span>Stack</span>
+                </div>
+                <div class="arc-space" data-space="links">
+                  <span class="arc-space-dot" style="--arc: #2bc8ff"></span>
+                  <span>Links</span>
+                </div>
+              </aside>
+              <div class="arc-main">
+                <div class="arc-topbar">
+                  <div class="arc-pills">
+                    <span class="arc-pill">eddiebian.me</span>
+                    <span class="arc-pill muted">About</span>
                   </div>
-                </section>
-
-                
+                </div>
+                <div class="arc-panels">
+                  <section class="arc-panel active" data-space-panel="profile">
+                    <div class="arc-profile">
+                      <img class="arc-avatar" src="assets/image.png" alt="Eddie Bian" />
+                      <div class="arc-profile-copy">
+                        <h2>Eddie Bian</h2>
+                        <p class="arc-role">Competitive programmer · Full-stack developer</p>
+                        <a class="arc-email" href="mailto:eddie.bian@yahoo.com">Eddie.bian@yahoo.com</a>
+                      </div>
+                    </div>
+                    <div class="arc-card">
+                      <h3>Now</h3>
+                      <p>Grade 11 IB student building tools, shipping hackathon projects, and mentoring DECA / CS / Robotics teams.</p>
+                    </div>
+                    <div class="arc-meta-grid">
+                      <div class="arc-card compact">
+                        <span class="label">Location</span>
+                        <span class="value">Toronto, Ontario</span>
+                      </div>
+                      <div class="arc-card compact">
+                        <span class="label">Focus</span>
+                        <span class="value">IB Diploma Program</span>
+                      </div>
+                    </div>
+                  </section>
+                  <section class="arc-panel" data-space-panel="stack">
+                    <div class="arc-card">
+                      <h3>Languages</h3>
+                      <p>Python, JavaScript, Java, C++</p>
+                    </div>
+                    <div class="arc-card">
+                      <h3>Frameworks & tools</h3>
+                      <p>React, FastAPI, Expo, React Native, Git, Supabase</p>
+                    </div>
+                    <div class="arc-card">
+                      <h3>Also using</h3>
+                      <p>Three.js, GSAP, Figma, PostgreSQL</p>
+                    </div>
+                  </section>
+                  <section class="arc-panel" data-space-panel="links">
+                    <a class="arc-link-row" href="https://github.com/B-Eddie" target="_blank" rel="noopener">
+                      <span>GitHub</span><span class="arc-link-go">@B-Eddie</span>
+                    </a>
+                    <a class="arc-link-row" href="https://www.linkedin.com/in/eddiebian/" target="_blank" rel="noopener">
+                      <span>LinkedIn</span><span class="arc-link-go">eddiebian</span>
+                    </a>
+                    <a class="arc-link-row" href="mailto:eddie.bian@yahoo.com">
+                      <span>Email</span><span class="arc-link-go">Eddie.bian@yahoo.com</span>
+                    </a>
+                    <a class="arc-link-row" href="assets/resume.pdf" download>
+                      <span>Résumé</span><span class="arc-link-go">Download</span>
+                    </a>
+                  </section>
+                </div>
               </div>
             </div>
           `,
@@ -361,81 +573,65 @@ class MacDesktop {
         return {
           title: "Contacts",
           html: `
-            <div style="background: #ffffff; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', system-ui, sans-serif; height: 100%; display: flex;">
-              <!-- Sidebar -->
-              <div style="width: 200px; background: #f5f5f7; border-right: 1px solid #e5e5e7; padding: 16px 0; height: 100%; overflow-y: auto; -webkit-overflow-scrolling: touch;">
-                <div style="padding: 0 16px 16px; border-bottom: 1px solid #e5e5e7; margin-bottom: 16px;">
-                  <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px;">
-                    <div style="width: 32px; height: 32px; background: #1d1d1f; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-weight: 600; font-size: 16px;">E</div>
-                    <div>
-                      <div style="font-weight: 600; font-size: 13px; color: #1d1d1f;">Eddie</div>
-                      <div style="font-size: 11px; color: #86868b;">Me</div>
-                    </div>
-                  </div>
-                </div>
-                <div style="padding: 0 16px;">
-                  <div style="font-size: 11px; font-weight: 600; color: #86868b; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;">All Contacts</div>
-                  <div style="display: flex; align-items: center; gap: 8px; padding: 8px; background: #e3f2fd; border-radius: 6px; margin-bottom: 4px;">
-                    <div style="width: 24px; height: 24px; background: #1d1d1f; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-weight: 600; font-size: 12px;">E</div>
-                    <div style="font-size: 13px; color: #1d1d1f;">Eddie</div>
-                  </div>
+            <div class="ios-contact">
+              <div class="ios-contact-hero">
+                <img class="ios-contact-avatar" src="assets/image.png" alt="Eddie Bian" />
+                <h1>Eddie Bian</h1>
+                <p class="ios-contact-sub">Grade 11 IB Student</p>
+                <div class="ios-contact-actions">
+                  <a class="ios-contact-action" href="tel:+19058058967">
+                    <span class="ios-contact-action-icon" aria-hidden="true">
+                      <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6.5 4.5h2.2l1.1 3.2-1.4 1.4a12.5 12.5 0 0 0 5.5 5.5l1.4-1.4 3.2 1.1v2.2A2 2 0 0 1 16.5 19 13.5 13.5 0 0 1 3 5.5 2 2 0 0 1 5 3.5h1.5z"/></svg>
+                    </span>
+                    <span>Call</span>
+                  </a>
+                  <a class="ios-contact-action" href="mailto:eddie.bian@yahoo.com">
+                    <span class="ios-contact-action-icon" aria-hidden="true">
+                      <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3.5" y="5.5" width="17" height="13" rx="2"/><path d="m4 7 8 6 8-6"/></svg>
+                    </span>
+                    <span>Mail</span>
+                  </a>
+                  <a class="ios-contact-action" href="https://github.com/B-Eddie" target="_blank" rel="noopener">
+                    <span class="ios-contact-action-icon" aria-hidden="true">
+                      <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M12 2a10 10 0 0 0-3.2 19.5c.5.1.7-.2.7-.5v-1.7c-2.8.6-3.4-1.2-3.4-1.2-.4-1-1-1.3-1-1.3-.9-.6.1-.6.1-.6 1 .1 1.5 1 1.5 1 .9 1.5 2.3 1.1 2.8.8.1-.6.3-1.1.6-1.3-2.2-.2-4.5-1.1-4.5-5a3.9 3.9 0 0 1 1-2.7 3.6 3.6 0 0 1 .1-2.7s.8-.3 2.8 1a9.6 9.6 0 0 1 5 0c2-1.3 2.8-1 2.8-1a3.6 3.6 0 0 1 .1 2.7 3.9 3.9 0 0 1 1 2.7c0 3.9-2.3 4.8-4.5 5 .4.3.7.9.7 1.8v2.6c0 .3.2.6.7.5A10 10 0 0 0 12 2z"/></svg>
+                    </span>
+                    <span>GitHub</span>
+                  </a>
+                  <a class="ios-contact-action" href="https://www.linkedin.com/in/eddiebian/" target="_blank" rel="noopener">
+                    <span class="ios-contact-action-icon" aria-hidden="true">
+                      <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M6.3 9.2H3.6V20h2.7V9.2zM5 3.8a1.6 1.6 0 1 0 0 3.2 1.6 1.6 0 0 0 0-3.2zM20.4 20h-2.7v-5.4c0-1.3 0-3-1.8-3s-2.1 1.4-2.1 2.9V20H11V9.2h2.6v1.5h.1c.4-.7 1.3-1.5 2.7-1.5 2.9 0 3.4 1.9 3.4 4.4V20z"/></svg>
+                    </span>
+                    <span>LinkedIn</span>
+                  </a>
                 </div>
               </div>
-              
-              <!-- Main Content -->
-              <div style="flex: 1; padding: 32px; display: flex; flex-direction: column; height: 100%; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch;">
-                <div style="display: flex; align-items: center; gap: 20px; margin-bottom: 32px;">
-                  <div style="width: 80px; height: 80px; background: #1d1d1f; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-size: 32px; font-weight: 600;">E</div>
+              <div class="ios-contact-card">
+                <a class="ios-contact-row" href="tel:+19058058967">
                   <div>
-                    <h1 style="font-size: 28px; font-weight: 700; color: #1d1d1f; margin: 0 0 4px 0;">Eddie</h1>
-                    <p style="font-size: 16px; color: #86868b; margin: 0;">Grade 11 IB Student</p>
+                    <div class="ios-contact-label">mobile</div>
+                    <div class="ios-contact-value">+1 (905) 805-8967</div>
                   </div>
-                </div>
-                
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px;">
+                </a>
+                <a class="ios-contact-row" href="mailto:eddie.bian@yahoo.com">
                   <div>
-                    <h3 style="font-size: 16px; font-weight: 600; color: #1d1d1f; margin: 0 0 12px 0;">Phone</h3>
-                    <div style="display: flex; align-items: center; gap: 8px; padding: 8px 0;">
-                      <span style="font-size: 14px; color: #86868b;">mobile</span>
-                      <span style="font-size: 14px; color: #1d1d1f;">+1 (905) 805-8967</span>
-                    </div>
+                    <div class="ios-contact-label">email</div>
+                    <div class="ios-contact-value">Eddie.bian@yahoo.com</div>
                   </div>
-                  
+                </a>
+              </div>
+              <div class="ios-contact-card">
+                <a class="ios-contact-row" href="https://github.com/B-Eddie" target="_blank" rel="noopener">
                   <div>
-                    <h3 style="font-size: 16px; font-weight: 600; color: #1d1d1f; margin: 0 0 12px 0;">Email</h3>
-                    <div style="display: flex; align-items: center; gap: 8px; padding: 8px 0;">
-                      <span style="font-size: 14px; color: #86868b;">work</span>
-                      <a href="mailto:eddie.bian@yahoo.com" style="font-size: 14px; color: #007aff; text-decoration: none;">eddie.bian@yahoo.com</a>
-                    </div>
+                    <div class="ios-contact-label">GitHub</div>
+                    <div class="ios-contact-value">github.com/B-Eddie</div>
                   </div>
-                  
+                </a>
+                <a class="ios-contact-row" href="https://www.linkedin.com/in/eddiebian/" target="_blank" rel="noopener">
                   <div>
-                    <h3 style="font-size: 16px; font-weight: 600; color: #1d1d1f; margin: 0 0 12px 0;">Social</h3>
-                    <div style="display: flex; align-items: center; gap: 8px; padding: 8px 0;">
-                      <span style="font-size: 14px; color: #86868b;">GitHub</span>
-                      <a href="https://github.com/B-Eddie" target="_blank" rel="noopener" style="font-size: 14px; color: #007aff; text-decoration: none;">@B-Eddie</a>
-                    </div>
-                    <div style="display: flex; align-items: center; gap: 8px; padding: 8px 0;">
-                      <span style="font-size: 14px; color: #86868b;">LinkedIn</span>
-                      <a href="https://www.linkedin.com/in/eddiebian/" target="_blank" rel="noopener" style="font-size: 14px; color: #007aff; text-decoration: none;">Eddie Bian</a>
-                    </div>
+                    <div class="ios-contact-label">LinkedIn</div>
+                    <div class="ios-contact-value">linkedin.com/in/eddiebian</div>
                   </div>
-                  
-                  <div>
-                    <h3 style="font-size: 16px; font-weight: 600; color: #1d1d1f; margin: 0 0 12px 0;">School</h3>
-                    <div style="font-size: 14px; color: #1d1d1f; line-height: 1.4;">
-                      IB Diploma Program<br>
-                      Ontario, Canada
-                    </div>
-                  </div>
-                </div>
-                
-                <div style="margin-top: 32px; padding-top: 24px; border-top: 1px solid #e5e5e7;">
-                  <h3 style="font-size: 16px; font-weight: 600; color: #1d1d1f; margin: 0 0 12px 0;">Notes</h3>
-                  <p style="font-size: 14px; color: #86868b; margin: 0; line-height: 1.4;">
-                    Passionate developer and Grade 11 IB student. Love creating innovative solutions through code and participating in hackathons.
-                  </p>
-                </div>
+                </a>
               </div>
             </div>
           `,
@@ -836,79 +1032,50 @@ class MacDesktop {
   }
 
   _initAboutTabs(win) {
-    const tabs = Array.from(win.querySelectorAll(".about-tab"));
-    const sections = Array.from(win.querySelectorAll(".about-section"));
-    if (!tabs.length || !sections.length) return;
-    if (tabs.length === 1) {
-      tabs[0].classList.add("active");
-      tabs[0].setAttribute("aria-selected", "true");
-      sections.forEach((s) => s.classList.add("active"));
-      return;
-    }
+    const spaces = Array.from(win.querySelectorAll(".arc-space"));
+    const panels = Array.from(win.querySelectorAll(".arc-panel"));
+    if (!spaces.length || !panels.length) return;
     const setActive = (key) => {
-      tabs.forEach((t) => {
-        const active = t.dataset.tab === key;
-        t.classList.toggle("active", active);
-        t.setAttribute("aria-selected", active ? "true" : "false");
-      });
-      sections.forEach((s) => {
-        const idKey = s.id.replace("about-section-", "");
-        s.classList.toggle("active", idKey === key);
-      });
+      spaces.forEach((s) => s.classList.toggle("active", s.dataset.space === key));
+      panels.forEach((p) =>
+        p.classList.toggle("active", p.dataset.spacePanel === key),
+      );
     };
-    // Ensure first tab reflects active state
-    const initial =
-      tabs.find((t) => t.classList.contains("active"))?.dataset.tab ||
-      tabs[0]?.dataset.tab;
-    if (initial) setActive(initial);
-    tabs.forEach((tab) => {
-      tab.addEventListener("click", () => setActive(tab.dataset.tab));
-      tab.addEventListener("keydown", (e) => {
+    spaces.forEach((space) => {
+      space.tabIndex = 0;
+      space.addEventListener("click", () => setActive(space.dataset.space));
+      space.addEventListener("keydown", (e) => {
         if (e.key === "Enter" || e.key === " ") {
           e.preventDefault();
-          setActive(tab.dataset.tab);
+          setActive(space.dataset.space);
         }
       });
-    });
-    // Keyboard left/right navigation
-    win.addEventListener("keydown", (e) => {
-      if (!tabs.includes(document.activeElement)) return;
-      const idx = tabs.indexOf(document.activeElement);
-      if (e.key === "ArrowRight") {
-        const next = tabs[(idx + 1) % tabs.length];
-        next.focus();
-      } else if (e.key === "ArrowLeft") {
-        const prev = tabs[(idx - 1 + tabs.length) % tabs.length];
-        prev.focus();
-      }
     });
   }
 
   _initAboutTilt(win) {
-    const img = win.querySelector(".about-photo img");
-    const frame = win.querySelector(".about-photo");
+    const img = win.querySelector(".arc-avatar");
+    const frame = win.querySelector(".arc-profile");
     if (!img || !frame) return;
     frame.style.perspective = "800px";
     img.style.transformStyle = "preserve-3d";
     img.style.transition = "transform 120ms ease, box-shadow 120ms ease";
-    const maxTilt = 10; // degrees
+    const maxTilt = 8;
     const onMove = (e) => {
-      const rect = frame.getBoundingClientRect();
-      const x = (e.clientX - rect.left) / rect.width; // 0..1
-      const y = (e.clientY - rect.top) / rect.height; // 0..1
+      const rect = img.getBoundingClientRect();
+      const x = (e.clientX - rect.left) / rect.width;
+      const y = (e.clientY - rect.top) / rect.height;
       const tiltX = (0.5 - y) * (maxTilt * 2);
       const tiltY = (x - 0.5) * (maxTilt * 2);
       img.style.transform = `rotateX(${tiltX.toFixed(
         2,
       )}deg) rotateY(${tiltY.toFixed(2)}deg) translateZ(8px)`;
-      img.style.boxShadow = "0 12px 28px rgba(0,0,0,0.35)";
     };
     const onLeave = () => {
       img.style.transform = "rotateX(0) rotateY(0) translateZ(0)";
-      img.style.boxShadow = "none";
     };
-    frame.addEventListener("pointermove", onMove);
-    frame.addEventListener("pointerleave", onLeave);
+    img.addEventListener("pointermove", onMove);
+    img.addEventListener("pointerleave", onLeave);
   }
 
   _initTerminal(win) {
@@ -1257,54 +1424,93 @@ Memory: ${Math.round(
           panel.style.pointerEvents = "auto";
           panel.innerHTML = `
             <style>
-              #projects-overlay-panel { font-family: 'Caveat', 'Patrick Hand', cursive; }
+              #projects-overlay-panel {
+                font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
+                --glass: rgba(255,255,255,0.22);
+                --glass-border: rgba(255,255,255,0.4);
+              }
               #projects-overlay-panel .hand-header {
-                position: fixed; top: 16px; left: 20px; right: 20px;
+                position: fixed; top: max(12px, env(safe-area-inset-top)); left: 16px; right: 16px;
                 display: flex; align-items: center; justify-content: space-between;
-                pointer-events: none;
-                z-index: 2;
+                z-index: 2; pointer-events: none;
               }
               #projects-overlay-panel .hand-title {
-                font-size: clamp(26px, 4vw, 40px);
-                font-weight: 700; letter-spacing: 0.5px;
-                text-shadow: 0 1px 0 rgba(0,0,0,0.15);
+                font-size: clamp(22px, 4vw, 34px);
+                font-weight: 700; letter-spacing: -0.03em;
+                color: #fff;
+                text-shadow: 0 2px 12px rgba(0,0,0,0.35);
               }
-              #projects-overlay-panel .hand-actions { display: flex; gap: 10px; pointer-events: auto; }
+              #projects-overlay-panel .hand-actions { pointer-events: auto; }
               #projects-overlay-panel .hand-btn {
-                background: #fffbcc; border: 2px solid #222; border-radius: 8px;
-                padding: 6px 12px; cursor: pointer; font-weight: 700; font-size: 18px;
-                box-shadow: 2px 2px 0 #222; transform: rotate(-1deg);
+                background: rgba(255,255,255,0.22);
+                backdrop-filter: blur(24px) saturate(180%);
+                -webkit-backdrop-filter: blur(24px) saturate(180%);
+                border: 1px solid rgba(255,255,255,0.45);
+                border-radius: 999px;
+                padding: 10px 16px; cursor: pointer; font-weight: 600; font-size: 14px;
+                color: #fff;
+                box-shadow: inset 0 1px 0 rgba(255,255,255,0.55), 0 8px 24px rgba(0,0,0,0.2);
               }
-              #projects-overlay-panel .hand-btn:hover { transform: rotate(1deg) translateY(-1px); }
-              #projects-overlay-panel .hand-notes { position: fixed; inset: 0; z-index: 1; pointer-events: none; }
-              #projects-overlay-panel .note-card {
-                position: absolute; width: clamp(180px, 22vw, 260px);
-                background: #fffdf7;
-                border: 2px solid rgba(0,0,0,0.85);
-                border-radius: 10px; padding: 12px 14px 14px;
-                box-shadow: 4px 4px 0 rgba(0,0,0,0.65);
-                filter: contrast(0.98) saturate(1.02);
-                cursor: pointer;
+              #projects-overlay-panel .hand-notes {
+                position: fixed; inset: 0;
+                z-index: 1;
+                overflow-y: auto;
+                -webkit-overflow-scrolling: touch;
+                padding: 84px 16px calc(28px + env(safe-area-inset-bottom));
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+                gap: 16px;
+                align-content: start;
                 pointer-events: auto;
-                transition: box-shadow 120ms ease;
-                transform: rotate(var(--tilt, 0deg));
               }
-              #projects-overlay-panel .note-card:hover { transform: rotate(var(--tilt-opposite, 0deg)); }
-              #projects-overlay-panel .note-title { font-size: 26px; font-weight: 700; margin-bottom: 6px; }
-              #projects-overlay-panel .note-body { font-size: 20px; line-height: 1.1; opacity: 0.9; }
+              #projects-overlay-panel .note-card {
+                position: relative;
+                width: 100%;
+                left: auto !important; top: auto !important;
+                background: rgba(255,255,255,0.16);
+                backdrop-filter: blur(28px) saturate(180%);
+                -webkit-backdrop-filter: blur(28px) saturate(180%);
+                border: 1px solid rgba(255,255,255,0.4);
+                border-radius: 22px;
+                padding: 14px;
+                box-shadow: inset 0 1px 0 rgba(255,255,255,0.5), 0 12px 32px rgba(0,0,0,0.2);
+                color: #fff;
+                cursor: pointer;
+                transform: none !important;
+                transition: transform 0.15s ease, box-shadow 0.15s ease;
+              }
+              #projects-overlay-panel .note-card:hover,
+              #projects-overlay-panel .note-card.open {
+                transform: translateY(-2px) !important;
+                box-shadow: inset 0 1px 0 rgba(255,255,255,0.6), 0 16px 40px rgba(0,0,0,0.28);
+              }
+              #projects-overlay-panel .note-title { font-size: 20px; font-weight: 700; margin-bottom: 6px; letter-spacing: -0.02em; }
+              #projects-overlay-panel .note-body { font-size: 14px; line-height: 1.3; opacity: 0.9; }
+              #projects-overlay-panel .note-body a { color: #dff5ff; }
               #projects-overlay-panel .note-img {
-                width: 100%; height: auto; display: block; margin-bottom: 8px;
-                background: #fff; border: 2px solid rgba(0,0,0,0.85); border-radius: 8px;
-                box-shadow: 2px 2px 0 rgba(0,0,0,0.65);
+                width: 100%; height: 140px; object-fit: cover; display: block; margin-bottom: 10px;
+                background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.25); border-radius: 14px;
               }
               #projects-overlay-panel .note-desc {
-                display: none; margin-top: 6px; font-size: 18px; line-height: 1.15; opacity: 0.95;
+                display: none; margin-top: 8px; font-size: 14px; line-height: 1.35; opacity: 0.95;
               }
+              #projects-overlay-panel .note-card.open .note-desc,
               #projects-overlay-panel .note-card:hover .note-desc { display: block; }
-              #projects-overlay-panel .note-card.open { box-shadow: 6px 6px 0 rgba(0,0,0,0.75); }
-              #projects-overlay-panel .note-card.open .note-desc { display: block; }
               @media (max-width: 820px) {
-                #projects-overlay-panel .note-card { width: clamp(160px, 42vw, 220px); }
+                #projects-overlay-panel .hand-notes {
+                  grid-template-columns: 1fr;
+                  padding-top: 92px;
+                }
+                #projects-overlay-panel .note-img { height: 160px; }
+              }
+              @media (min-width: 821px) {
+                #projects-overlay-panel .hand-notes {
+                  padding: 96px 48px 48px;
+                  grid-template-columns: repeat(2, minmax(0, 1fr));
+                  max-width: 980px;
+                  margin: 0 auto;
+                  left: 0; right: 0;
+                }
               }
             </style>
             <div class="hand-header">
@@ -1314,29 +1520,29 @@ Memory: ${Math.round(
               </div>
             </div>
             <div class="hand-notes">
-              <div class="note-card" style="left: 38%; top: 8%; --tilt: -4deg; --tilt-opposite: 4deg;" data-project="vertex">
+              <div class="note-card" data-project="vertex">
                 <img class="note-img" src="assets/vertex.png" alt="Vertex preview" />
                 <div class="note-title">Vertex</div>
                 <div class="note-body"><a href="https://fblc-26.vercel.app/" target="_blank" rel="noopener noreferrer">fblc-26.vercel.app</a></div>
-                <div class="note-desc">1st Place CNLC winner. Platform connecting high school students with volunteer opportunities. Features advanced filtering, real-time applications, rating systems, and hours tracking.</div>
+                <div class="note-desc">1st Place CNLC winner. Platform connecting high school students with volunteer opportunities.</div>
               </div>
-              <div class="note-card" style="left: 18%; top: 28%; --tilt: -3deg; --tilt-opposite: 3deg;" data-project="Tangenai">
+              <div class="note-card" data-project="Tangenai">
                 <img class="note-img" src="assets/tangenai.png" alt="Tangen AI preview" />
                 <div class="note-title">Tangen AI</div>
                 <div class="note-body"><a href="https://tangenai.work" target="_blank" rel="noopener noreferrer">tangenai.work</a></div>
-                <div class="note-desc">AI-powered stock scorer tool. Searches online for sentiment analysis and combines with key metrics.</div>
+                <div class="note-desc">AI-powered stock scorer. Sentiment analysis combined with key metrics.</div>
               </div>
-              <div class="note-card" style="left: 45%; top: 40%; --tilt: 2deg; --tilt-opposite: -2deg;" data-project="ragnohacks">
+              <div class="note-card" data-project="ragnohacks">
                 <img class="note-img" src="assets/ragno.png" alt="RagnoHacks preview" />
                 <div class="note-title">RagnoHacks</div>
                 <div class="note-body"><a href="https://ragnohacks.ca/old" target="_blank" rel="noopener noreferrer">ragnohacks.ca</a></div>
                 <div class="note-desc">Hackathon website.</div>
-                </div>
-                <div class="note-card" style="left: 68%; top: 24%; --tilt: -1.5deg; --tilt-opposite: 1.5deg;" data-project="healthhub">
+              </div>
+              <div class="note-card" data-project="healthhub">
                 <img class="note-img" src="assets/fblc.png" alt="HealthHub preview" />
                 <div class="note-title">HealthHub</div>
                 <div class="note-body"><a href="https://github.com/B-Eddie/fblc" target="_blank" rel="noopener noreferrer">github.com/B-Eddie/fblc</a></div>
-                <div class="note-desc">Provider app that allows online booking for services.</div>
+                <div class="note-desc">Provider app for online booking.</div>
               </div>
             </div>
           `;
