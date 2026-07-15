@@ -863,8 +863,35 @@ canvas {
   cursor: pointer;
 }
 
+#mac-desktop-root.ios-mode .ios-page-dots {
+  display: flex;
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: calc(118px + env(safe-area-inset-bottom, 0px));
+  justify-content: center;
+  gap: 7px;
+  z-index: 25;
+  pointer-events: none;
+}
+
+#mac-desktop-root.ios-mode .ios-page-dots span {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.4);
+}
+
+#mac-desktop-root.ios-mode .ios-page-dots span.active {
+  background: #fff;
+}
+
 #mac-desktop-root.ios-mode.app-open #mac-dock {
   display: none !important;
+}
+
+#mac-desktop-root.ios-mode.app-open .ios-page-dots {
+  display: none;
 }
 
 #mac-desktop-root.ios-mode.app-open #mac-desktop-area > .mac-icon {

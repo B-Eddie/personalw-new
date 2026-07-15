@@ -1,84 +1,35 @@
-# Eddie Bian - Interactive 3D Portfolio
+# eddiebian.me
 
-An interactive, immersive portfolio website featuring a 3D animated laptop model built with Three.js, GSAP, and vanilla JavaScript.
+Personal site. Scroll through a 3D laptop scene, then land on a desktop UI (Mac on desktop, iPhone-style on mobile). There's also a Fast Mode if you just want the text.
 
 **Live:** [eddiebian.me](https://eddiebian.me)
 
----
+## Stack
 
-## 🎨 Features
+Three.js, GSAP (ScrollTrigger), vanilla JS/CSS. Hosted on GitHub Pages.
 
-- **3D Interactive Experience**: Dynamic 3D laptop model that responds to user interactions
-- **Smooth Animations**: Scroll-triggered animations powered by GSAP and ScrollTrigger
-- **Responsive Design**: Optimized for desktop, laptop, and mobile devices
-- **macOS-Style UI**: Native-looking window components that match system aesthetics
-- **Loading Animation**: Engaging code-rain loading overlay
-- **Performance Optimized**: High-performance WebGL rendering with adaptive pixel ratios
-
----
-
-## 🛠️ Tech Stack
-
-### Core Libraries
-
-- **[Three.js](https://threejs.org/)** — 3D graphics rendering
-- **[GSAP](https://gsap.com/)** — Animation library with ScrollTrigger plugin
-- **[ES6 Modules](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide/Modules)** — Modular JavaScript architecture
-
-### Styling
-
-- Vanilla CSS with responsive design patterns
-- Custom animations and transitions
-
----
-
-## 📁 Project Structure
+## Layout
 
 ```
-├── index.html          # Main HTML entry point
-├── styles.css          # Global styles and animations
-├── js/
-│   ├── main.js         # Application entry point
-│   ├── scene.js        # Three.js scene setup and management
-│   ├── laptop.js       # 3D laptop model
-│   ├── animations.js   # Animation controller
-│   ├── desktop.js      # Desktop/mobile responsive logic
-│   ├── config.js       # Configuration constants
-│   └── (additional modules)
-├── models/             # 3D model assets
-├── assets/             # Images and icons
-└── CNAME              # Domain configuration for GitHub Pages
+index.html
+styles.css
+js/
+  main.js          # boots the app
+  scene.js         # Three.js setup
+  laptop.js        # laptop model + screen
+  animations.js    # scroll timeline
+  desktop.js       # desktop/iOS overlay + apps
+  config.js        # knobs for camera, lid, etc.
+models/            # glb
+assets/            # images, icons, resume
 ```
 
----
+## Running locally
 
-## 🎭 Key Components
+Just serve the folder — anything static works:
 
-### SceneManager (`js/scene.js`)
+```bash
+npx serve .
+```
 
-Handles Three.js scene initialization, camera setup, and WebGL renderer configuration.
-
-### LaptopModel (`js/laptop.js`)
-
-3D laptop model with interactive elements and responsive positioning based on device type.
-
-### AnimationManager (`js/animations.js`)
-
-Orchestrates scroll-triggered animations and real-time interactions using GSAP and ScrollTrigger.
-
-### App (`js/main.js`)
-
-Main application class that coordinates scene management, model loading, and animations with proper error handling.
-
----
-
-## ⚙️ Configuration
-
-Core settings can be customized in `js/config.js`:
-
-- Camera position and field of view
-- Lighting configuration
-- Animation timings and easing functions
-- Responsive breakpoints for desktop/laptop/mobile
-
----
+Then open the URL it prints.
