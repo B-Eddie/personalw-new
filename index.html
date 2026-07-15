@@ -28,8 +28,51 @@
       aria-live="polite"
       aria-busy="true"
     >
-      <div class="loading-spinner" aria-hidden="true"></div>
-      <p class="loading-text">Loading</p>
+      <div class="code-rain" aria-hidden="true">
+        <div class="code-line">function loadPortfolio() {</div>
+        <div class="code-line">
+          const assets = ['model', 'textures', 'scripts'];
+        </div>
+        <div class="code-line">return assets.map(asset => load(asset));</div>
+        <div class="code-line">}</div>
+        <div class="code-line">import * as THREE from 'three';</div>
+        <div class="code-line">const scene = new THREE.Scene();</div>
+        <div class="code-line">// Loading 3D model...</div>
+        <div class="code-line">console.log('Portfolio ready!');</div>
+        <div class="code-line">class LaptopModel {</div>
+        <div class="code-line">constructor(scene) {</div>
+        <div class="code-line">this.scene = scene;</div>
+        <div class="code-line">}</div>
+        <div class="code-line">}</div>
+        <div class="code-line">gsap.registerPlugin(ScrollTrigger);</div>
+        <div class="code-line">const tl = gsap.timeline();</div>
+        <div class="code-line">// Animating laptop opening</div>
+        <div class="code-line">tl.to(hinge.rotation, { x: 0.1 });</div>
+        <div class="code-line">export class SceneManager {</div>
+        <div class="code-line">setupCamera() {</div>
+        <div class="code-line">
+          this.camera = new THREE.PerspectiveCamera();
+        </div>
+        <div class="code-line">}</div>
+        <div class="code-line">}</div>
+        <div class="code-line">// Initializing WebGL renderer</div>
+        <div class="code-line">this.renderer = new THREE.WebGLRenderer();</div>
+        <div class="code-line">
+          renderer.setSize(window.innerWidth, window.innerHeight);
+        </div>
+        <div class="code-line">// Adding lights to scene</div>
+        <div class="code-line">
+          const keyLight = new THREE.DirectionalLight();
+        </div>
+        <div class="code-line">scene.add(keyLight);</div>
+        <div class="code-line">// Loading GLTF model</div>
+        <div class="code-line">const loader = new GLTFLoader();</div>
+        <div class="code-line">loader.load('models/laptop.glb', callback);</div>
+      </div>
+      <div class="spinner-container">
+        <div class="loading-spinner" aria-hidden="true"></div>
+        <p class="loading-text">Loading</p>
+      </div>
     </div>
 
     <canvas id="webgl"></canvas>
