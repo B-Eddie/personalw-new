@@ -205,7 +205,7 @@ class MacDesktop {
                       
                       <div class="detail-row">
                         <div class="detail-label">School</div>
-                        <div class="detail-value">White Oaks SS (IB)</div>
+                        <div class="detail-value">IB Diploma Program</div>
                       </div>
                       <div class="detail-row">
                         <div class="detail-label">Location</div>
@@ -336,9 +336,8 @@ class MacDesktop {
                   <div>
                     <h3 style="font-size: 16px; font-weight: 600; color: #1d1d1f; margin: 0 0 12px 0;">School</h3>
                     <div style="font-size: 14px; color: #1d1d1f; line-height: 1.4;">
-                      White Oaks Secondary School<br>
-                      1330 Montclair Dr<br>
-                      Oakville, ON L6H 1Z5
+                      IB Diploma Program<br>
+                      Ontario, Canada
                     </div>
                   </div>
                 </div>
@@ -955,7 +954,7 @@ class MacDesktop {
           <div style="color: #6f42c1; font-weight: 600; margin-bottom: 8px;">Work Experience:</div>
           <div style="margin-left: 16px; margin-bottom: 8px;">
             <div style="font-weight: 600; margin-bottom: 4px;">Grade 11 IB Student</div>
-            <div style="color: #666; margin-bottom: 4px;">White Oaks Secondary School</div>
+            <div style="color: #666; margin-bottom: 4px;">IB Diploma Program</div>
             <div>• Developing full-stack web applications</div>
             <div>• Participating in hackathons and coding competitions</div>
             <div>• Learning advanced programming concepts</div>
@@ -985,7 +984,7 @@ class MacDesktop {
           <div style="margin-left: 16px;">
             <div style="font-weight: 600; margin-bottom: 4px;">Eddie</div>
             <div>Grade 11 IB Student</div>
-            <div>White Oaks Secondary School</div>
+            <div>IB Diploma Program</div>
             <div>Passionate Developer & Hackathon Enthusiast</div>
           </div>
         `;
