@@ -278,7 +278,7 @@ class MacDesktop {
               <div style="width: 200px; background: #f5f5f7; border-right: 1px solid #e5e5e7; padding: 16px 0; height: 100%; overflow-y: auto; -webkit-overflow-scrolling: touch;">
                 <div style="padding: 0 16px 16px; border-bottom: 1px solid #e5e5e7; margin-bottom: 16px;">
                   <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px;">
-                    <div style="width: 32px; height: 32px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-weight: 600; font-size: 16px;">E</div>
+                    <div style="width: 32px; height: 32px; background: #1d1d1f; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-weight: 600; font-size: 16px;">E</div>
                     <div>
                       <div style="font-weight: 600; font-size: 13px; color: #1d1d1f;">Eddie</div>
                       <div style="font-size: 11px; color: #86868b;">Me</div>
@@ -288,7 +288,7 @@ class MacDesktop {
                 <div style="padding: 0 16px;">
                   <div style="font-size: 11px; font-weight: 600; color: #86868b; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;">All Contacts</div>
                   <div style="display: flex; align-items: center; gap: 8px; padding: 8px; background: #e3f2fd; border-radius: 6px; margin-bottom: 4px;">
-                    <div style="width: 24px; height: 24px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-weight: 600; font-size: 12px;">E</div>
+                    <div style="width: 24px; height: 24px; background: #1d1d1f; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-weight: 600; font-size: 12px;">E</div>
                     <div style="font-size: 13px; color: #1d1d1f;">Eddie</div>
                   </div>
                 </div>
@@ -297,7 +297,7 @@ class MacDesktop {
               <!-- Main Content -->
               <div style="flex: 1; padding: 32px; display: flex; flex-direction: column; height: 100%; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch;">
                 <div style="display: flex; align-items: center; gap: 20px; margin-bottom: 32px;">
-                  <div style="width: 80px; height: 80px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-size: 32px; font-weight: 600;">E</div>
+                  <div style="width: 80px; height: 80px; background: #1d1d1f; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-size: 32px; font-weight: 600;">E</div>
                   <div>
                     <h1 style="font-size: 28px; font-weight: 700; color: #1d1d1f; margin: 0 0 4px 0;">Eddie</h1>
                     <p style="font-size: 16px; color: #86868b; margin: 0;">Grade 11 IB Student</p>
@@ -1215,7 +1215,7 @@ Memory: ${Math.round(
             <div class="hand-notes">
               <div class="note-card" style="left: 38%; top: 8%; --tilt: -4deg; --tilt-opposite: 4deg;" data-project="vertex">
                 <img class="note-img" src="assets/vertex.png" alt="Vertex preview" />
-                <div class="note-title">Vertex 🎓</div>
+                <div class="note-title">Vertex</div>
                 <div class="note-body"><a href="https://fblc-26.vercel.app/" target="_blank" rel="noopener noreferrer">fblc-26.vercel.app</a></div>
                 <div class="note-desc">1st Place CNLC winner. Platform connecting high school students with volunteer opportunities. Features advanced filtering, real-time applications, rating systems, and hours tracking.</div>
               </div>
