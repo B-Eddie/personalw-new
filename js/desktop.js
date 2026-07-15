@@ -444,83 +444,126 @@ class MacDesktop {
         return {
           title: "About Me",
           html: `
-            <div class="arc-about">
-              <aside class="arc-sidebar" aria-label="Spaces">
-                <div class="arc-space active" data-space="profile">
-                  <span class="arc-space-dot" style="--arc: #ff5c8a"></span>
-                  <span>Profile</span>
+            <div class="arc-browser">
+              <aside class="arc-sidebar" aria-label="Arc sidebar">
+                <div class="arc-favorites" role="toolbar" aria-label="Favorites">
+                  <button type="button" class="arc-fav active" data-tab="eddie" title="Eddie">
+                    <img src="assets/image.png" alt="" />
+                  </button>
+                  <button type="button" class="arc-fav" data-tab="stack" title="Stack">
+                    <span class="arc-fav-glyph" style="--c:#7c5cff">{}</span>
+                  </button>
+                  <button type="button" class="arc-fav" data-tab="links" title="Links">
+                    <span class="arc-fav-glyph" style="--c:#2bc8ff">@</span>
+                  </button>
+                  <a class="arc-fav" href="assets/resume.pdf" download title="Résumé">
+                    <span class="arc-fav-glyph" style="--c:#34c759">R</span>
+                  </a>
                 </div>
-                <div class="arc-space" data-space="stack">
-                  <span class="arc-space-dot" style="--arc: #7c5cff"></span>
-                  <span>Stack</span>
+
+                <div class="arc-space-title">
+                  <span class="arc-space-swatch"></span>
+                  <span>Portfolio</span>
                 </div>
-                <div class="arc-space" data-space="links">
-                  <span class="arc-space-dot" style="--arc: #2bc8ff"></span>
-                  <span>Links</span>
+
+                <div class="arc-section-label">Pinned</div>
+                <div class="arc-tab-list" role="tablist">
+                  <button type="button" class="arc-tab active" role="tab" aria-selected="true" data-tab="eddie">
+                    <span class="arc-tab-icon"><img src="assets/image.png" alt="" /></span>
+                    <span class="arc-tab-title">Eddie Bian</span>
+                  </button>
+                  <button type="button" class="arc-tab" role="tab" aria-selected="false" data-tab="stack">
+                    <span class="arc-tab-icon glyph" style="--c:#7c5cff">{}</span>
+                    <span class="arc-tab-title">Stack</span>
+                  </button>
+                  <button type="button" class="arc-tab" role="tab" aria-selected="false" data-tab="links">
+                    <span class="arc-tab-icon glyph" style="--c:#2bc8ff">@</span>
+                    <span class="arc-tab-title">Links</span>
+                  </button>
+                </div>
+
+                <div class="arc-divider" aria-hidden="true"></div>
+
+                <div class="arc-section-label">Today</div>
+                <div class="arc-tab-list">
+                  <button type="button" class="arc-tab" role="tab" aria-selected="false" data-tab="now">
+                    <span class="arc-tab-icon glyph" style="--c:#ff5c8a">✦</span>
+                    <span class="arc-tab-title">Now</span>
+                  </button>
+                </div>
+
+                <div class="arc-space-switcher" aria-label="Spaces">
+                  <span class="arc-space-dot active" title="Portfolio"></span>
                 </div>
               </aside>
-              <div class="arc-main">
-                <div class="arc-topbar">
-                  <div class="arc-pills">
-                    <span class="arc-pill">eddiebian.me</span>
-                    <span class="arc-pill muted">About</span>
-                  </div>
+
+              <main class="arc-viewport">
+                <div class="arc-urlbar" aria-hidden="true">
+                  <span class="arc-url-lock"></span>
+                  <span class="arc-url-text">eddiebian.me/about</span>
                 </div>
-                <div class="arc-panels">
-                  <section class="arc-panel active" data-space-panel="profile">
-                    <div class="arc-profile">
-                      <img class="arc-avatar" src="assets/image.png" alt="Eddie Bian" />
-                      <div class="arc-profile-copy">
-                        <h2>Eddie Bian</h2>
-                        <p class="arc-role">Competitive programmer · Full-stack developer</p>
-                        <a class="arc-email" href="mailto:eddie.bian@yahoo.com">Eddie.bian@yahoo.com</a>
+
+                <div class="arc-pages">
+                  <article class="arc-page active" data-tab-panel="eddie" role="tabpanel">
+                    <header class="arc-page-hero">
+                      <img class="arc-page-avatar" src="assets/image.png" alt="Eddie Bian" />
+                      <div>
+                        <p class="arc-page-kicker">About</p>
+                        <h1>Eddie Bian</h1>
+                        <p class="arc-page-lead">Competitive programmer and full-stack developer.</p>
                       </div>
+                    </header>
+                    <p class="arc-page-body">
+                      Grade 11 IB student building tools, shipping hackathon projects, and mentoring DECA, Computer Science, and Robotics teams.
+                    </p>
+                    <dl class="arc-page-meta">
+                      <div><dt>Email</dt><dd><a href="mailto:eddie.bian@yahoo.com">Eddie.bian@yahoo.com</a></dd></div>
+                      <div><dt>Location</dt><dd>Toronto, Ontario</dd></div>
+                      <div><dt>Focus</dt><dd>IB Diploma Program</dd></div>
+                    </dl>
+                  </article>
+
+                  <article class="arc-page" data-tab-panel="stack" role="tabpanel" hidden>
+                    <p class="arc-page-kicker">Stack</p>
+                    <h1>What I build with</h1>
+                    <div class="arc-page-columns">
+                      <section>
+                        <h2>Languages</h2>
+                        <p>Python, JavaScript, Java, C++</p>
+                      </section>
+                      <section>
+                        <h2>Frameworks &amp; tools</h2>
+                        <p>React, FastAPI, Expo, React Native, Git, Supabase</p>
+                      </section>
+                      <section>
+                        <h2>Also using</h2>
+                        <p>Three.js, GSAP, Figma, PostgreSQL</p>
+                      </section>
                     </div>
-                    <div class="arc-card">
-                      <h3>Now</h3>
-                      <p>Grade 11 IB student building tools, shipping hackathon projects, and mentoring DECA / CS / Robotics teams.</p>
-                    </div>
-                    <div class="arc-meta-grid">
-                      <div class="arc-card compact">
-                        <span class="label">Location</span>
-                        <span class="value">Toronto, Ontario</span>
-                      </div>
-                      <div class="arc-card compact">
-                        <span class="label">Focus</span>
-                        <span class="value">IB Diploma Program</span>
-                      </div>
-                    </div>
-                  </section>
-                  <section class="arc-panel" data-space-panel="stack">
-                    <div class="arc-card">
-                      <h3>Languages</h3>
-                      <p>Python, JavaScript, Java, C++</p>
-                    </div>
-                    <div class="arc-card">
-                      <h3>Frameworks & tools</h3>
-                      <p>React, FastAPI, Expo, React Native, Git, Supabase</p>
-                    </div>
-                    <div class="arc-card">
-                      <h3>Also using</h3>
-                      <p>Three.js, GSAP, Figma, PostgreSQL</p>
-                    </div>
-                  </section>
-                  <section class="arc-panel" data-space-panel="links">
-                    <a class="arc-link-row" href="https://github.com/B-Eddie" target="_blank" rel="noopener">
-                      <span>GitHub</span><span class="arc-link-go">@B-Eddie</span>
-                    </a>
-                    <a class="arc-link-row" href="https://www.linkedin.com/in/eddiebian/" target="_blank" rel="noopener">
-                      <span>LinkedIn</span><span class="arc-link-go">eddiebian</span>
-                    </a>
-                    <a class="arc-link-row" href="mailto:eddie.bian@yahoo.com">
-                      <span>Email</span><span class="arc-link-go">Eddie.bian@yahoo.com</span>
-                    </a>
-                    <a class="arc-link-row" href="assets/resume.pdf" download>
-                      <span>Résumé</span><span class="arc-link-go">Download</span>
-                    </a>
-                  </section>
+                  </article>
+
+                  <article class="arc-page" data-tab-panel="links" role="tabpanel" hidden>
+                    <p class="arc-page-kicker">Links</p>
+                    <h1>Find me</h1>
+                    <ul class="arc-page-links">
+                      <li><a href="https://github.com/B-Eddie" target="_blank" rel="noopener">GitHub <span>@B-Eddie</span></a></li>
+                      <li><a href="https://www.linkedin.com/in/eddiebian/" target="_blank" rel="noopener">LinkedIn <span>eddiebian</span></a></li>
+                      <li><a href="mailto:eddie.bian@yahoo.com">Email <span>Eddie.bian@yahoo.com</span></a></li>
+                      <li><a href="assets/resume.pdf" download>Résumé <span>PDF</span></a></li>
+                    </ul>
+                  </article>
+
+                  <article class="arc-page" data-tab-panel="now" role="tabpanel" hidden>
+                    <p class="arc-page-kicker">Now</p>
+                    <h1>Currently</h1>
+                    <ul class="arc-page-list">
+                      <li>Training Executive for DECA, Computer Science, and Robotics</li>
+                      <li>Building full-stack apps and hackathon projects</li>
+                      <li>Open to collaboration</li>
+                    </ul>
+                  </article>
                 </div>
-              </div>
+              </main>
             </div>
           `,
         };
@@ -1027,55 +1070,44 @@ class MacDesktop {
     // About window tab interactions
     if (appId === "about") {
       this._initAboutTabs(win);
-      this._initAboutTilt(win);
     }
   }
 
   _initAboutTabs(win) {
-    const spaces = Array.from(win.querySelectorAll(".arc-space"));
-    const panels = Array.from(win.querySelectorAll(".arc-panel"));
-    if (!spaces.length || !panels.length) return;
-    const setActive = (key) => {
-      spaces.forEach((s) => s.classList.toggle("active", s.dataset.space === key));
-      panels.forEach((p) =>
-        p.classList.toggle("active", p.dataset.spacePanel === key),
-      );
+    const tabs = Array.from(
+      win.querySelectorAll(".arc-tab[data-tab], .arc-fav[data-tab]"),
+    );
+    const pages = Array.from(win.querySelectorAll(".arc-page"));
+    const urlText = win.querySelector(".arc-url-text");
+    if (!tabs.length || !pages.length) return;
+
+    const urls = {
+      eddie: "eddiebian.me/about",
+      stack: "eddiebian.me/stack",
+      links: "eddiebian.me/links",
+      now: "eddiebian.me/now",
     };
-    spaces.forEach((space) => {
-      space.tabIndex = 0;
-      space.addEventListener("click", () => setActive(space.dataset.space));
-      space.addEventListener("keydown", (e) => {
-        if (e.key === "Enter" || e.key === " ") {
-          e.preventDefault();
-          setActive(space.dataset.space);
+
+    const setActive = (key) => {
+      tabs.forEach((t) => {
+        const on = t.dataset.tab === key;
+        t.classList.toggle("active", on);
+        if (t.getAttribute("role") === "tab") {
+          t.setAttribute("aria-selected", on ? "true" : "false");
         }
       });
-    });
-  }
+      pages.forEach((p) => {
+        const on = p.dataset.tabPanel === key;
+        p.classList.toggle("active", on);
+        if (on) p.removeAttribute("hidden");
+        else p.setAttribute("hidden", "");
+      });
+      if (urlText) urlText.textContent = urls[key] || "eddiebian.me";
+    };
 
-  _initAboutTilt(win) {
-    const img = win.querySelector(".arc-avatar");
-    const frame = win.querySelector(".arc-profile");
-    if (!img || !frame) return;
-    frame.style.perspective = "800px";
-    img.style.transformStyle = "preserve-3d";
-    img.style.transition = "transform 120ms ease, box-shadow 120ms ease";
-    const maxTilt = 8;
-    const onMove = (e) => {
-      const rect = img.getBoundingClientRect();
-      const x = (e.clientX - rect.left) / rect.width;
-      const y = (e.clientY - rect.top) / rect.height;
-      const tiltX = (0.5 - y) * (maxTilt * 2);
-      const tiltY = (x - 0.5) * (maxTilt * 2);
-      img.style.transform = `rotateX(${tiltX.toFixed(
-        2,
-      )}deg) rotateY(${tiltY.toFixed(2)}deg) translateZ(8px)`;
-    };
-    const onLeave = () => {
-      img.style.transform = "rotateX(0) rotateY(0) translateZ(0)";
-    };
-    img.addEventListener("pointermove", onMove);
-    img.addEventListener("pointerleave", onLeave);
+    tabs.forEach((tab) => {
+      tab.addEventListener("click", () => setActive(tab.dataset.tab));
+    });
   }
 
   _initTerminal(win) {
