@@ -32,28 +32,84 @@ class MacDesktop {
     root.setAttribute("role", "application");
     root.innerHTML = `
 			<div id="mac-menubar">
-        <div class="left">
-          <span class="apple" style="font-weight:600"></span>
-          <span class="menu-item active-app" id="menu-active-app">Finder</span>
-          <span class="menu-item">File</span>
-          <span class="menu-item">Edit</span>
-          <span class="menu-item">View</span>
+        <div class="mac-menubar-content">
+          <div class="left">
+            <span class="apple" style="font-weight:600"></span>
+            <span class="menu-item active-app" id="menu-active-app">Finder</span>
+            <span class="menu-item">File</span>
+            <span class="menu-item">Edit</span>
+            <span class="menu-item">View</span>
+          </div>
+          <div class="center">Scroll back up to return</div>
+          <div class="right">
+            <span class="status-item" id="mac-clock"></span>
+          </div>
         </div>
-        <div class="center">Scroll back up to return</div>
-        <div class="right">
-          <span class="status-item" id="mac-clock"></span>
+        <div class="ios-status-bar" aria-hidden="true">
+          <span class="ios-time" id="ios-clock">9:41</span>
+          <div class="ios-notch" aria-hidden="true"></div>
+          <div class="ios-status-glyphs">
+            <svg class="ios-signal" viewBox="0 0 17 12" width="17" height="12" aria-hidden="true">
+              <rect x="0" y="7.5" width="3" height="4.5" rx="0.7" fill="currentColor"/>
+              <rect x="4.5" y="5" width="3" height="7" rx="0.7" fill="currentColor"/>
+              <rect x="9" y="2.5" width="3" height="9.5" rx="0.7" fill="currentColor"/>
+              <rect x="13.5" y="0" width="3" height="12" rx="0.7" fill="currentColor" opacity="0.35"/>
+            </svg>
+            <svg class="ios-wifi" viewBox="0 0 16 12" width="16" height="12" aria-hidden="true">
+              <path fill="currentColor" d="M8 9.6a1.45 1.45 0 1 1 0 2.9 1.45 1.45 0 0 1 0-2.9Zm0-3.35c1.55 0 2.97.56 4.08 1.5l-1.1 1.15A4.3 4.3 0 0 0 8 7.85c-.92 0-1.77.28-2.48.76L4.42 7.46A5.9 5.9 0 0 1 8 6.25Zm0-3.3c2.4 0 4.6.9 6.3 2.4L13.2 6.5A7.3 7.3 0 0 0 8 4.55c-2 0-3.84.72-5.25 1.92L1.65 5.32A9.4 9.4 0 0 1 8 2.95Z"/>
+            </svg>
+            <div class="ios-battery" aria-hidden="true">
+              <div class="ios-battery-body"><div class="ios-battery-level"></div></div>
+              <div class="ios-battery-cap"></div>
+            </div>
+          </div>
         </div>
 			</div>
       <div id="mac-desktop-area" tabindex="-1"></div>
-      <div id="mac-dock" aria-label="Minimized Apps" role="menubar"></div>
+      <div class="ios-page-dots" aria-hidden="true"><span class="active"></span></div>
+      <div id="mac-dock" aria-label="Dock" role="menubar"></div>
+      <div class="ios-home-indicator" aria-hidden="true"></div>
 		`;
     document.body.appendChild(root);
     this._root = root;
     this._desktopArea = root.querySelector("#mac-desktop-area");
     this._dockEl = root.querySelector("#mac-dock");
     this._clockEl = root.querySelector("#mac-clock");
+    this._iosClockEl = root.querySelector("#ios-clock");
     this._buildIcons();
+    this._syncChromeMode();
+    this._mediaQuery = window.matchMedia("(max-width: 820px)");
+    this._onChromeModeChange = () => this._syncChromeMode();
+    if (this._mediaQuery.addEventListener) {
+      this._mediaQuery.addEventListener("change", this._onChromeModeChange);
+    } else if (this._mediaQuery.addListener) {
+      this._mediaQuery.addListener(this._onChromeModeChange);
+    }
+    const homeIndicator = root.querySelector(".ios-home-indicator");
+    if (homeIndicator) {
+      homeIndicator.addEventListener("click", () => {
+        if (!this._isIOSMode()) return;
+        [...this._openWindows.keys()].forEach((id) => this._closeWindow(id));
+      });
+    }
     this._tickClock();
+  }
+
+  _isIOSMode() {
+    return window.matchMedia("(max-width: 820px)").matches;
+  }
+
+  _syncChromeMode() {
+    if (!this._root) return;
+    const ios = this._isIOSMode();
+    this._root.classList.toggle("ios-mode", ios);
+    this._root.classList.toggle("app-open", ios && this._openWindows.size > 0);
+    if (ios) {
+      this._buildIOSDock();
+    } else {
+      this._clearIOSDock();
+      this._updateDockVisibility();
+    }
   }
 
   _buildIcons() {
@@ -116,6 +172,10 @@ class MacDesktop {
   // Dock removed per user request; related handlers pruned.
 
   _handleIconClick(e, icon) {
+    if (this._isIOSMode()) {
+      this._openAppWindow(icon.id);
+      return;
+    }
     // Single click just select
     const already = e.currentTarget.classList.contains("selected");
     this._desktopArea
@@ -144,40 +204,68 @@ class MacDesktop {
       return;
     }
     const content = this._getAppContent(appId);
+    const ios = this._isIOSMode();
     const win = document.createElement("section");
-    win.className = "mac-window";
+    win.className = "mac-window" + (ios ? " ios-app" : "");
     win.dataset.appId = appId;
-    win.innerHTML = `
-      <header class="titlebar">
-				<div class="traffic-lights">
-					<span class="close" data-action="close"></span>
-					<span class="minimize" data-action="minimize"></span>
-					<span class="zoom" data-action="zoom"></span>
-				</div>
-				<div class="title">${content.title}</div>
-			</header>
-			<div class="content" tabindex="0">${content.html}</div>
-		`;
+    if (ios) {
+      win.innerHTML = `
+        <header class="ios-nav">
+          <button type="button" class="ios-nav-close" data-action="close" aria-label="Close">
+            <span class="ios-chevron" aria-hidden="true"></span>
+            <span>Home</span>
+          </button>
+          <div class="ios-nav-title">${content.title}</div>
+          <div class="ios-nav-spacer"></div>
+        </header>
+        <div class="content" tabindex="0">${content.html}</div>
+      `;
+    } else {
+      win.innerHTML = `
+        <header class="titlebar">
+          <div class="traffic-lights">
+            <span class="close" data-action="close"></span>
+            <span class="minimize" data-action="minimize"></span>
+            <span class="zoom" data-action="zoom"></span>
+          </div>
+          <div class="title">${content.title}</div>
+        </header>
+        <div class="content" tabindex="0">${content.html}</div>
+      `;
+    }
     this._desktopArea.appendChild(win);
-    // Set initial inline styles for consistent positioning
-    win.style.position = "absolute";
-    win.style.left = "160px";
-    win.style.top = "120px";
-    win.style.width = "720px";
-    win.style.height = "480px";
+    if (ios) {
+      win.style.position = "absolute";
+      win.style.left = "0";
+      win.style.top = "0";
+      win.style.width = "100%";
+      win.style.height = "100%";
+    } else {
+      // Set initial inline styles for consistent positioning
+      win.style.position = "absolute";
+      win.style.left = "160px";
+      win.style.top = "120px";
+      win.style.width = "720px";
+      win.style.height = "480px";
+    }
     requestAnimationFrame(() => win.classList.add("visible"));
     this._openWindows.set(appId, {
       el: win,
-      state: {
-        x: 160,
-        y: 120,
-        w: 720,
-        h: 480,
-      },
+      state: ios
+        ? { x: 0, y: 0, w: window.innerWidth, h: window.innerHeight }
+        : {
+            x: 160,
+            y: 120,
+            w: 720,
+            h: 480,
+          },
     });
     this._attachWindowEvents(win, appId);
     this._focusWindow(appId);
     this._markDockOpen(appId, true);
+    if (ios) {
+      this._root.classList.add("app-open");
+    }
   }
 
   _getAppContent(appId) {
@@ -387,15 +475,21 @@ class MacDesktop {
         focusHandler();
       });
     }
-    // Buttons
-    win.querySelectorAll(".traffic-lights span").forEach((btn) => {
+    // Buttons (Mac traffic lights + iOS nav close)
+    win.querySelectorAll("[data-action]").forEach((btn) => {
       btn.addEventListener("click", (e) => {
+        e.stopPropagation();
         const action = e.currentTarget.dataset.action;
         if (action === "close") this._closeWindow(appId);
         if (action === "minimize") this._minimizeWindow(appId);
         if (action === "zoom") this._zoomWindow(appId);
       });
     });
+
+    // iOS full-screen apps: no drag / resize
+    if (this._isIOSMode() || win.classList.contains("ios-app")) {
+      return;
+    }
 
     // Titlebar element and prevent native dragstart (avoids ghost drag jump)
     const titlebar = win.querySelector(".titlebar");
@@ -1063,16 +1157,23 @@ Memory: ${Math.round(
     data.el.classList.remove("visible");
     setTimeout(() => data.el.remove(), 320);
     this._openWindows.delete(appId);
-    this._removeDockItem(appId);
+    if (!this._isIOSMode()) {
+      this._removeDockItem(appId);
+    }
     this._markDockOpen(appId, false);
     // If no windows left, reset active app label
     if (this._openWindows.size === 0) {
       const activeAppEl = document.getElementById("menu-active-app");
       if (activeAppEl) activeAppEl.textContent = "Finder";
+      if (this._root) this._root.classList.remove("app-open");
     }
   }
 
   _minimizeWindow(appId) {
+    if (this._isIOSMode()) {
+      this._closeWindow(appId);
+      return;
+    }
     const data = this._openWindows.get(appId);
     if (!data) return;
     data.el.style.transition = "transform 0.35s ease, opacity 0.35s ease";
@@ -1303,8 +1404,41 @@ Memory: ${Math.round(
     this._focusWindow(appId);
   }
 
-  _addDockItem(appId) {
+  _buildIOSDock() {
     if (!this._dockEl) return;
+    this._dockEl.innerHTML = "";
+    const dockApps = ["about", "projects", "skills", "contact"];
+    dockApps.forEach((appId) => {
+      const meta = (this._appMeta && this._appMeta[appId]) || { label: appId };
+      const btn = document.createElement("button");
+      btn.className = "dock-item ios-dock-item";
+      btn.type = "button";
+      btn.dataset.appId = appId;
+      btn.setAttribute("role", "menuitem");
+      btn.title = meta.title || meta.label || appId;
+      btn.innerHTML = `
+        <span class="dock-icon">${
+          meta.image ? `<img src="${meta.image}" alt="">` : ""
+        }</span>
+      `;
+      btn.addEventListener("click", () => this._openAppWindow(appId));
+      this._dockEl.appendChild(btn);
+    });
+    this._dockEl.style.display = "flex";
+    if (this._root) this._root.classList.add("has-dock");
+  }
+
+  _clearIOSDock() {
+    if (!this._dockEl || !this._root) return;
+    if (this._dockEl.querySelector(".ios-dock-item")) {
+      this._dockEl.innerHTML = "";
+      this._dockEl.style.display = "none";
+      this._root.classList.remove("has-dock");
+    }
+  }
+
+  _addDockItem(appId) {
+    if (!this._dockEl || this._isIOSMode()) return;
     const existing = this._dockEl.querySelector(`[data-app-id="${appId}"]`);
     if (existing) return;
     const meta = (this._appMeta && this._appMeta[appId]) || { label: appId };
@@ -1325,13 +1459,18 @@ Memory: ${Math.round(
   }
 
   _removeDockItem(appId) {
-    if (!this._dockEl) return;
+    if (!this._dockEl || this._isIOSMode()) return;
     const el = this._dockEl.querySelector(`[data-app-id="${appId}"]`);
     if (el) el.remove();
   }
 
   _updateDockVisibility() {
     if (!this._dockEl) return;
+    if (this._isIOSMode()) {
+      this._dockEl.style.display = "flex";
+      if (this._root) this._root.classList.add("has-dock");
+      return;
+    }
     const hasItems = this._dockEl.children.length > 0;
     this._dockEl.style.display = hasItems ? "flex" : "none";
     if (this._root) {
@@ -1546,19 +1685,22 @@ Memory: ${Math.round(
   }
 
   _tickClock() {
+    const now = new Date();
+    const time = now.toLocaleTimeString(undefined, {
+      hour: "numeric",
+      minute: "2-digit",
+    });
     if (this._clockEl) {
-      const now = new Date();
       const weekday = now.toLocaleDateString(undefined, { weekday: "short" });
       const month = now.toLocaleDateString(undefined, { month: "short" });
       const day = now.getDate();
       const dateStr = `${weekday} ${month} ${day}`;
-      const time = now.toLocaleTimeString(undefined, {
-        hour: "2-digit",
-        minute: "2-digit",
-      });
       this._clockEl.textContent = `${dateStr}\u2003${time}`;
     }
-    requestAnimationFrame(() => this._tickClock());
+    if (this._iosClockEl) {
+      this._iosClockEl.textContent = time;
+    }
+    setTimeout(() => this._tickClock(), 15000);
   }
 }
 
