@@ -3,82 +3,54 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Eddie Bian</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&display=swap"
-      rel="stylesheet"
+    <title>Eddie Bian — A little desktop on the internet</title>
+    <meta
+      name="description"
+      content="The personal desktop of Eddie Bian. Explore projects, play with a terminal, take a tiny break, and say hello."
     />
+    <meta name="theme-color" content="#1e1e21" />
+    <meta property="og:title" content="Eddie Bian — Make yourself at home" />
+    <meta
+      property="og:description"
+      content="A playful desktop full of projects, ideas, and little surprises."
+    />
+    <meta property="og:type" content="website" />
+    <meta property="og:image" content="https://eddiebian.me/assets/image.png" />
     <link rel="stylesheet" href="styles.css" />
-    <link
-      rel="preload"
-      href="models/laptop.glb"
-      as="fetch"
-      crossorigin="anonymous"
-    />
-    <link rel="preload" href="assets/image.png" as="image" />
+    <link rel="stylesheet" href="desktop.css" />
     <link rel="icon" type="image/png" href="assets/image.png" />
     <link rel="apple-touch-icon" href="assets/image.png" />
   </head>
-  <body class="is-loading">
+  <body>
+    <a class="skip-link" href="#desktop-windows">Skip to content</a>
+    <noscript
+      ><div class="noscript-note">
+        This desktop uses JavaScript.
+        <a href="assets/resume.pdf">Read Eddie’s résumé instead</a>.
+      </div></noscript
+    >
     <div
       id="loading"
       class="loading-overlay"
       aria-live="polite"
       aria-busy="true"
     >
-      <div class="code-rain" aria-hidden="true">
-        <div class="code-line">function loadPortfolio() {</div>
-        <div class="code-line">
-          const assets = ['model', 'textures', 'scripts'];
-        </div>
-        <div class="code-line">return assets.map(asset => load(asset));</div>
-        <div class="code-line">}</div>
-        <div class="code-line">import * as THREE from 'three';</div>
-        <div class="code-line">const scene = new THREE.Scene();</div>
-        <div class="code-line">// Loading 3D model...</div>
-        <div class="code-line">console.log('Portfolio ready!');</div>
-        <div class="code-line">class LaptopModel {</div>
-        <div class="code-line">constructor(scene) {</div>
-        <div class="code-line">this.scene = scene;</div>
-        <div class="code-line">}</div>
-        <div class="code-line">}</div>
-        <div class="code-line">gsap.registerPlugin(ScrollTrigger);</div>
-        <div class="code-line">const tl = gsap.timeline();</div>
-        <div class="code-line">// Animating laptop opening</div>
-        <div class="code-line">tl.to(hinge.rotation, { x: 0.1 });</div>
-        <div class="code-line">export class SceneManager {</div>
-        <div class="code-line">setupCamera() {</div>
-        <div class="code-line">
-          this.camera = new THREE.PerspectiveCamera();
-        </div>
-        <div class="code-line">}</div>
-        <div class="code-line">}</div>
-        <div class="code-line">// Initializing WebGL renderer</div>
-        <div class="code-line">this.renderer = new THREE.WebGLRenderer();</div>
-        <div class="code-line">
-          renderer.setSize(window.innerWidth, window.innerHeight);
-        </div>
-        <div class="code-line">// Adding lights to scene</div>
-        <div class="code-line">
-          const keyLight = new THREE.DirectionalLight();
-        </div>
-        <div class="code-line">scene.add(keyLight);</div>
-        <div class="code-line">// Loading GLTF model</div>
-        <div class="code-line">const loader = new GLTFLoader();</div>
-        <div class="code-line">loader.load('models/laptop.glb', callback);</div>
-      </div>
       <div class="spinner-container">
         <div class="loading-spinner" aria-hidden="true"></div>
-        <p class="loading-text">Loading</p>
+        <p class="loading-monogram">eb.</p><p class="loading-text">Setting the desk.</p><div class="loading-track"><i></i></div><span class="loading-progress">Loading the 3D scene…</span>
+        <a href="?desktop=1" class="loading-escape">Skip to the desktop ↗</a>
       </div>
     </div>
 
-    <canvas id="webgl"></canvas>
+    <canvas id="webgl" aria-label="A 3D desk with Eddie’s sticker-covered laptop and notebook"></canvas>
+    <section id="intro-hud" aria-label="Welcome to Eddie’s desk">
+      <a class="intro-wordmark" href="./">Eddie Bian<span>A little corner of the internet</span></a>
+      <div class="intro-copy"><p class="intro-kicker">Developer. Builder. Perpetually curious.</p><h1>Make yourself<br>at home<span>.</span></h1><p>A few projects, a few experiments,<br>and a desktop that’s yours to explore.</p></div>
+      <div class="intro-bottom"><span class="intro-chapter">01 <i></i> The desk</span><span class="intro-hint">Scroll to open the laptop <span>↓</span></span><span class="intro-number">00%</span></div>
+    </section>
 
     <button type="button" id="fast-mode-btn" class="fast-mode-btn">
-      Fast Mode
+      Text version
     </button>
 
     <div id="fast-mode-scroll-indicator" class="fast-mode-scroll-indicator">
@@ -87,7 +59,7 @@
 
     <div id="fast-mode" class="fast-mode">
       <button type="button" id="exit-fast-mode" class="fm-exit">
-        Exit Fast Mode
+        Back to desktop
       </button>
 
       <div id="fast-mode-ready-notice" class="fm-ready">
@@ -131,61 +103,7 @@
 
         <section id="fast-projects" class="fm-section">
           <h2>Projects</h2>
-          <ul class="fm-list">
-            <li>
-              <h3>
-                <a
-                  href="https://fblc-26.vercel.app/"
-                  target="_blank"
-                  rel="noopener"
-                  >Vertex</a
-                >
-              </h3>
-              <p class="fm-meta-line">
-                FBLC, 2024 — Full-stack web platform — 1st Place, CNLC
-              </p>
-              <p>
-                Platform connecting Ontario high school students with volunteer
-                opportunities for the 40-hour community service requirement.
-                Filtering, real-time applications, ratings, hours tracking, and
-                role-based access for students, businesses, and educators.
-              </p>
-              <p class="fm-meta-line">
-                Next.js, TypeScript, Tailwind CSS, Supabase, PostgreSQL, Leaflet
-              </p>
-            </li>
-            <li>
-              <h3>Pew Pew</h3>
-              <p class="fm-meta-line">
-                Hack The North, Sept 2024 — Sponsor Prize
-              </p>
-              <p>
-                FastAPI security tool converting legacy CCDC intrusion logs into
-                visual attack timelines, mapping compromised hosts and threat
-                actors. Sponsor prize among 850+ hackers.
-              </p>
-            </li>
-            <li>
-              <h3>Goose Dropping Detection</h3>
-              <p class="fm-meta-line">Jamhacks, June 2024 — Best Marketed</p>
-              <p>
-                Raspberry Pi computer vision system detecting goose droppings in
-                real time to maintain safer paths. Best Marketed among 200+
-                participants.
-              </p>
-            </li>
-            <li>
-              <h3>TangenAI</h3>
-              <p class="fm-meta-line">
-                Dec 2023 – Feb 2024 — Mobile app — DECA qualified
-              </p>
-              <p>
-                Expo and React Native app analyzing financial news sentiment to
-                identify stock trend signals. Qualified for DECA International
-                Career Development Conference.
-              </p>
-            </li>
-          </ul>
+          <ul class="fm-list" id="text-projects"></ul>
         </section>
 
         <section id="fast-achievements" class="fm-section">
@@ -210,11 +128,11 @@
           <dl class="fm-skills">
             <div>
               <dt>Languages</dt>
-              <dd>Python, JavaScript, Java, C++</dd>
+              <dd>Python, JavaScript, TypeScript, Java, C++, Rust</dd>
             </div>
             <div>
               <dt>Frameworks &amp; tools</dt>
-              <dd>React, FastAPI, Git, Expo, React Native</dd>
+              <dd>React, Next.js, FastAPI, Git, Expo, React Native, Tauri</dd>
             </div>
             <div>
               <dt>Other</dt>
@@ -284,7 +202,10 @@
             <li>Phone — (905) 805-8967</li>
             <li>
               GitHub —
-              <a href="https://github.com/b-eddie" target="_blank" rel="noopener"
+              <a
+                href="https://github.com/b-eddie"
+                target="_blank"
+                rel="noopener"
                 >github.com/b-eddie</a
               >
             </li>
@@ -308,7 +229,7 @@
       </main>
     </div>
 
-    <!-- External Libraries -->
+    <!-- 3D libraries and the model load only when the visitor chooses the intro. -->
     <script type="importmap">
       {
         "imports": {
@@ -317,14 +238,6 @@
         }
       }
     </script>
-    <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/ScrollTrigger.min.js"></script>
-
-    <!-- Application Scripts -->
-    <script type="module" src="js/scene.js"></script>
-    <script type="module" src="js/laptop.js"></script>
-    <script type="module" src="js/animations.js"></script>
-    <script type="module" src="js/main.js"></script>
     <script type="module" src="js/desktop.js"></script>
   </body>
 </html>

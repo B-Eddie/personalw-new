@@ -36,7 +36,7 @@ export class LaptopModel {
     this._closedAngleApplied = 0;
 
     // Exposed promise for external await
-    this.ready = new Promise((resolve) => (this._resolveReady = resolve));
+    this.ready = new Promise((resolve, reject) => { this._resolveReady = resolve; this._rejectReady = reject; });
 
     this.init();
   }
@@ -47,10 +47,17 @@ export class LaptopModel {
   loadCombinedModel() {
     const loader = new GLTFLoader();
     loader.load(
-      "models/laptop.glb",
+      "models/laptop-web.glb",
       (gltf) => this._onModelLoaded(gltf.scene),
-      undefined,
-      (err) => console.error("Failed to load models/laptop.glb", err),
+      (event) => {
+        if (!event.total) return;
+        const percentage = Math.min(100, Math.round(event.loaded / event.total * 100));
+        const progress = document.querySelector(".loading-progress");
+        if (progress) progress.textContent = percentage === 100 ? "Preparing the scene…" : `Loading the 3D scene · ${percentage}%`;
+        const track = document.querySelector(".loading-track i");
+        if (track) track.style.width = `${percentage}%`;
+      },
+      (err) => this._rejectReady(err),
     );
   }
 
@@ -162,7 +169,7 @@ export class LaptopModel {
     if (laptop.useBootScreen) {
       this._initBootScreenTexture("VNZklasZKSWjWUk");
     } else {
-      this._applyScreenTexture("models/e.jpg", "VNZklasZKSWjWUk");
+      this._applyScreenTexture("assets/image.png", "VNZklasZKSWjWUk");
     }
 
     // Initial angle logic

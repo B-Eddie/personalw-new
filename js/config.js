@@ -17,7 +17,8 @@ export const CONFIG = {
     finalRootPosition: { z: -4, y: 0.4 },
     finalScale: 10,
     finalCamera: { z: 4.5, y: 1.1 },
-    modelScale: 0.1,
+    modelScale: 0.11,
+    initialGroupRotation: { x: -0.10, y: -0.06, z: 0.025 },
     // New: initial root group offset so the laptop starts farther away
     initialRootPosition: { z: -3.5, y: -15, x: 0 },
     finalTiltX: -0.9, // body tilt after opening

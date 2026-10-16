@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1200" fill="none">
+<defs>
+ <linearGradient id="sky" x2="0" y2="1"><stop stop-color="#afc9ca"/><stop offset="1" stop-color="#e4e8d9"/></linearGradient>
+ <linearGradient id="mountain" x2="0.6" y2="1"><stop stop-color="#91b6b4"/><stop offset="1" stop-color="#477d7e"/></linearGradient>
+ <linearGradient id="near" x2="0.8" y2="1"><stop stop-color="#4e8b82"/><stop offset="1" stop-color="#164b4b"/></linearGradient>
+ <filter id="grain"><feTurbulence type="fractalNoise" baseFrequency=".6" numOctaves="3" stitchTiles="stitch"/><feColorMatrix type="saturate" values="0"/><feComponentTransfer><feFuncA type="linear" slope=".055"/></feComponentTransfer><feBlend in="SourceGraphic" mode="soft-light"/></filter>
+</defs>
+<g filter="url(#grain)">
+<path fill="url(#sky)" d="M0 0h1920v1200H0z"/>
+<circle cx="1410" cy="255" r="92" fill="#f8edd4" opacity=".8"/>
+<path d="m0 694 190-144 140 82 269-332 182 225 171-130 221 218 192-252 239 285 316-139v693H0Z" fill="#b1c7bf"/>
+<path d="m0 804 330-176 270-328 183 226 171-131 221 218 192-252 260 310 293-172v701H0Z" fill="url(#mountain)"/>
+<path d="m330 628 270-328 183 226-101-48-69-90-29 112-40-35-69 107-34-28Z" fill="#edf0e6"/>
+<path d="m1175 613 192-252 155 186-115-81-24 36-35-65-72 104-37-14Z" fill="#e5ece2"/>
+<path d="m817 502 137-107 142 140-124-76-31 53-34-43-53 44Z" fill="#d8e5dc"/>
+<path d="M0 800c240-155 347 47 598-47s359-71 605 86 461-119 717-64v425H0Z" fill="#6d9b90"/>
+<path d="M0 1029c205-248 433-254 676-143s406 103 625-37 409-54 619 76v275H0Z" fill="url(#near)"/>
+<path d="M0 1124c296-173 385-141 648-30s489-97 699-65 343 93 573 9v162H0Z" fill="#204f4c"/>
+<path d="M1097 1200c-155-144-188-203-184-248 5-61 93-79 84-129" stroke="#dae3ca" stroke-width="8" opacity=".3"/>
+</g>
+</svg>

@@ -39,6 +39,8 @@ export class SceneManager {
     this.camera.position.set(p.x, p.y, p.z);
     this.camera.up.set(0, 0, -1); // orient so Z points toward screen if needed
     this.camera.lookAt(l.x, l.y, l.z);
+    this.camera.fov = 2 * Math.atan(Math.tan(35 * Math.PI / 360) * Math.max(1, 1.35 / this.camera.aspect)) * 180 / Math.PI;
+    this.camera.updateProjectionMatrix();
     this.scene.add(this.camera);
   }
 
@@ -53,7 +55,7 @@ export class SceneManager {
     this.renderer.setPixelRatio(
       Math.min(window.devicePixelRatio, this.pixelRatioCap),
     );
-    this.renderer.setClearColor(0x20232a, 1);
+    this.renderer.setClearColor(0x242321, 1);
     // Keep initial GPU cost lower on constrained devices.
     this.renderer.shadowMap.enabled = this.shadowsEnabled;
     this.renderer.shadowMap.type = this.isConstrainedDevice
@@ -104,6 +106,7 @@ export class SceneManager {
 
   resize() {
     this.camera.aspect = window.innerWidth / window.innerHeight;
+    this.camera.fov = 2 * Math.atan(Math.tan(35 * Math.PI / 360) * Math.max(1, 1.35 / this.camera.aspect)) * 180 / Math.PI;
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(window.innerWidth, window.innerHeight);
     this.renderer.setPixelRatio(

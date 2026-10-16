@@ -1,2091 +1,1267 @@
-// macOS-like desktop overlay that appears after scrolling past the 3D intro
-// Non-intrusive: doesn't modify first page markup; injects its own root container.
+import { moveWindow, resizeWindow } from "./window-geometry.mjs";
+import {
+  apps,
+  projects,
+  symbol,
+  appIcon,
+  welcomeContent,
+  projectsContent,
+  contactContent,
+} from "./content.js";
 
-class MacDesktop {
-  constructor(options = {}) {
-    this.options = Object.assign(
-      {
-        appearScrollProgress: 0.95, // require near-complete scroll
-        disappearThreshold: 0.7, // must scroll much farther up to hide
-        throttleMs: 80,
-        transitionDelayMs: 420, // wait after threshold before enabling pointer events
-        appearAfterIdleMs: 160, // user stops scrolling for this long
-        requireBottomProximityPx: 220, // consider near bottom within a larger range
-        unlockUpIntentPx: 300, // upward scroll intent needed to dismiss while frozen (increased)
-      },
-      options,
-    );
-    this._root = null;
-    this._visible = false;
-    this._lastScrollCheck = 0;
-    this._winZ = 100; // stacking for active windows
-    this._openWindows = new Map();
-    this._idleTimer = null;
-    this._initDOM();
-    this._bindGlobal();
+const $ = (selector, root = document) => root.querySelector(selector);
+const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
+const storage = {
+  get(key, fallback = "") {
+    try {
+      return localStorage.getItem(`eddie-os:${key}`) ?? fallback;
+    } catch {
+      return fallback;
+    }
+  },
+  set(key, value) {
+    try {
+      localStorage.setItem(`eddie-os:${key}`, value);
+      return true;
+    } catch {
+      return false;
+    }
+  },
+};
+const intro = !new URLSearchParams(location.search).has("desktop");
+
+class EddieDesktop {
+  constructor() {
+    this.windows = new Map();
+    this.z = 10;
+    this.active = null;
+    this.wallpaper = storage.get("wallpaper", "forest");
+    if (!["alpine", "forest", "dusk"].includes(this.wallpaper))
+      this.wallpaper = "forest";
+    this.widgets = storage.get("widgets", "on") === "on";
+    this.history = [];
+    this.autoHideDock = storage.get("autohide", "on") === "on";
+    if (storage.get("native-revision") !== "1") {
+      this.wallpaper = "forest";
+      storage.set("wallpaper", "forest");
+      storage.set("native-revision", "1");
+    }
+    this.mount();
+    this.bind();
+    this.tick();
+    this.applyAppearance();
+    if (!intro) {
+      this.show();
+      this.open("about", { initial: true });
+    }
   }
 
-  _initDOM() {
-    if (document.getElementById("mac-desktop-root")) return; // already there
+  mount() {
     const root = document.createElement("div");
-    root.id = "mac-desktop-root";
-    root.setAttribute("role", "application");
+    root.id = "eddie-os";
+    root.setAttribute("aria-label", "Eddie’s personal desktop");
     root.innerHTML = `
-			<div id="mac-menubar">
-        <div class="mac-menubar-content">
-          <div class="left">
-            <span class="apple" style="font-weight:600"></span>
-            <span class="menu-item active-app" id="menu-active-app">Finder</span>
-            <span class="menu-item">File</span>
-            <span class="menu-item">Edit</span>
-            <span class="menu-item">View</span>
-          </div>
-          <div class="center">Scroll back up to return</div>
-          <div class="right">
-            <span class="status-item" id="mac-clock"></span>
-          </div>
-        </div>
-        <div class="ios-status-bar" aria-hidden="true">
-          <span class="ios-time" id="ios-clock">9:41</span>
-          <div class="ios-notch" aria-hidden="true"></div>
-          <div class="ios-status-glyphs">
-            <svg class="ios-signal" viewBox="0 0 17 12" width="17" height="12" aria-hidden="true">
-              <rect x="0" y="7.5" width="3" height="4.5" rx="0.7" fill="currentColor"/>
-              <rect x="4.5" y="5" width="3" height="7" rx="0.7" fill="currentColor"/>
-              <rect x="9" y="2.5" width="3" height="9.5" rx="0.7" fill="currentColor"/>
-              <rect x="13.5" y="0" width="3" height="12" rx="0.7" fill="currentColor" opacity="0.35"/>
-            </svg>
-            <svg class="ios-wifi" viewBox="0 0 16 12" width="16" height="12" aria-hidden="true">
-              <path fill="currentColor" d="M8 9.6a1.45 1.45 0 1 1 0 2.9 1.45 1.45 0 0 1 0-2.9Zm0-3.35c1.55 0 2.97.56 4.08 1.5l-1.1 1.15A4.3 4.3 0 0 0 8 7.85c-.92 0-1.77.28-2.48.76L4.42 7.46A5.9 5.9 0 0 1 8 6.25Zm0-3.3c2.4 0 4.6.9 6.3 2.4L13.2 6.5A7.3 7.3 0 0 0 8 4.55c-2 0-3.84.72-5.25 1.92L1.65 5.32A9.4 9.4 0 0 1 8 2.95Z"/>
-            </svg>
-            <div class="ios-battery" aria-hidden="true">
-              <div class="ios-battery-body"><div class="ios-battery-level"></div></div>
-              <div class="ios-battery-cap"></div>
-            </div>
-          </div>
-        </div>
-			</div>
-      <div id="mac-desktop-area" tabindex="-1"></div>
-      <div class="ios-page-dots" aria-hidden="true"><span class="active"></span></div>
-      <div id="mac-dock" aria-label="Dock" role="menubar"></div>
-      <div class="ios-home-indicator" aria-hidden="true"></div>
-		`;
-    document.body.appendChild(root);
-    this._root = root;
-    this._desktopArea = root.querySelector("#mac-desktop-area");
-    this._dockEl = root.querySelector("#mac-dock");
-    this._clockEl = root.querySelector("#mac-clock");
-    this._iosClockEl = root.querySelector("#ios-clock");
-    this._buildIcons();
-    this._syncChromeMode();
-    this._mediaQuery = window.matchMedia("(max-width: 820px)");
-    this._onChromeModeChange = () => this._syncChromeMode();
-    if (this._mediaQuery.addEventListener) {
-      this._mediaQuery.addEventListener("change", this._onChromeModeChange);
-    } else if (this._mediaQuery.addListener) {
-      this._mediaQuery.addListener(this._onChromeModeChange);
-    }
-    const homeIndicator = root.querySelector(".ios-home-indicator");
-    if (homeIndicator) {
-      homeIndicator.addEventListener("click", () => {
-        if (!this._isIOSMode()) return;
-        [...this._openWindows.keys()].forEach((id) => this._closeWindow(id));
-      });
-    }
-    this._tickClock();
+      <div class="desktop-wallpaper" aria-hidden="true"></div>
+      <header class="os-menubar"><nav class="menu-left" aria-label="Desktop menu">
+        <button class="os-mark" data-menu="home" aria-label="Apple menu"></button>
+        <button class="active-app" data-menu="home">Finder</button>
+        <button class="desktop-menu-item" data-menu="file">File</button>
+        <button class="desktop-menu-item" data-menu="edit">Edit</button><button class="desktop-menu-item" data-menu="view">View</button><button class="desktop-menu-item" data-menu="go">Go</button>
+        <button class="desktop-menu-item" data-menu="window">Window</button>
+        <button class="desktop-menu-item" data-menu="help">Help</button>
+      </nav><div class="menu-right"><svg class="status-battery" viewBox="0 0 28 13" aria-label="Battery full"><rect x="1" y="2" width="22" height="9" rx="2" fill="none" stroke="white" stroke-width="1.2"/><rect x="3" y="4" width="18" height="5" rx="1"/><path d="M25 4v5" stroke="white" stroke-width="2"/></svg><svg class="status-wifi" viewBox="0 0 20 16" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M2 4q8-7 16 0M5 8q5-4 10 0m-7 4q2-2 4 0"/><circle cx="10" cy="15" r="1" fill="white" stroke="none"/></svg><button data-command="spotlight" aria-label="Search apps">${symbol("search")}</button><button data-command="controls" aria-label="Control Center">${symbol("sliders")}</button><time class="menu-clock"></time></div></header>
+      <main id="desktop-windows" tabindex="-1">
+        <aside class="desktop-widgets" aria-label="Desktop widgets">
+          <div class="time-widget"><div class="analog-clock" aria-hidden="true"><i class="clock-hour"></i><i class="clock-minute"></i><b></b><span class="clock-12">12</span><span class="clock-3">3</span><span class="clock-6">6</span><span class="clock-9">9</span></div><div class="widget-date"><span class="widget-weekday"></span><strong class="widget-day"></strong><small class="widget-month"></small></div><div class="widget-city">Toronto, Canada <span>Local time</span></div></div>
+          <button class="desktop-note" data-open="notes"><span class="note-pin"></span><span class="note-kicker">a note to self</span><strong>Stay curious.<br>Build useful things.<br>Have a little fun.</strong><span class="note-signature">— Eddie</span><span class="note-corner">↗</span></button>
+
+        </aside>
+        <nav class="desktop-files" aria-label="Desktop files">
+          <button data-open="projects" class="desktop-file"><img src="assets/icons/native/folder.png" alt="" draggable="false"/><span>Projects</span><small>${projects.length} items</small></button>
+          <button data-open="resume" class="desktop-file"><img src="assets/icons/native/document.png" alt="" draggable="false"/><span>Résumé.pdf</span></button>
+          <button data-open="terminal" class="desktop-file">${appIcon("terminal")}<span>hello_world.sh</span></button>
+          <button data-command="trash" class="desktop-file trash-file">${symbol("trash")}<span>Trash</span></button>
+        </nav>
+
+      </main>
+      <div class="dock-reveal-zone" aria-hidden="true"></div>
+      <nav class="os-dock" aria-label="App dock">${apps.map((app, i) => `<button class="dock-app ${i === 7 ? "dock-separated" : ""}" data-open="${app.id}" aria-label="${app.name}" title="${app.name}">${appIcon(app.icon)}<span class="dock-tooltip">${app.name}</span><i class="dock-dot"></i></button>`).join("")}<div class="dock-minimized"></div><button class="dock-app dock-trash dock-separated" data-command="trash" aria-label="Trash"><img class="app-art" src="assets/icons/native/empty-trash.png" alt=""/><span class="dock-tooltip">Trash</span></button></nav>
+      <div class="os-popover" hidden></div>
+      <div class="spotlight-backdrop" hidden><section class="spotlight" role="dialog" aria-modal="true" aria-label="Search apps"><div class="spotlight-input">${symbol("search")}<input type="search" placeholder="Spotlight Search" aria-label="Search apps and projects" autocomplete="off"/><button data-command="dismiss" aria-label="Close search">esc</button></div><div class="spotlight-results"></div><footer><span>↑ ↓ to navigate</span><span>↵ to open</span></footer></section></div>
+      <div class="os-toast" role="status" aria-live="polite"></div>`;
+    document.body.append(root);
+    this.root = root;
+    this.area = $("#desktop-windows");
   }
 
-  _isIOSMode() {
-    return window.matchMedia("(max-width: 820px)").matches;
-  }
-
-  _syncChromeMode() {
-    if (!this._root) return;
-    const ios = this._isIOSMode();
-    this._root.classList.toggle("ios-mode", ios);
-    this._root.classList.toggle("app-open", ios && this._openWindows.size > 0);
-    if (ios) {
-      this._buildIOSDock();
-    } else {
-      this._clearIOSDock();
-      this._updateDockVisibility();
-    }
-  }
-
-  _buildIcons() {
-    const icons = [
-      {
-        id: "about",
-        label: "About Me",
-        image: "assets/icons/arc.png",
-        title: "About Me",
-      },
-      {
-        id: "projects",
-        label: "Projects",
-        image: "assets/icons/stickies.png",
-        title: "Projects",
-      },
-      {
-        id: "skills",
-        label: "Skills",
-        image: "assets/icons/terminal.png",
-        title: "Skills",
-      },
-      {
-        id: "contact",
-        label: "Contact",
-        image: "assets/icons/contacts.png",
-        title: "Contact",
-      },
-      {
-        id: "resume",
-        label: "Résumé",
-        image: "assets/icons/textedit.png",
-        title: "Résumé",
-      },
-    ];
-    this._appMeta = Object.fromEntries(icons.map((i) => [i.id, i]));
-    this._homePageIndex = 0;
-
-    const pages = document.createElement("div");
-    pages.className = "home-pages";
-    pages.id = "home-pages";
-
-    const page1 = document.createElement("div");
-    page1.className = "home-page active";
-    page1.dataset.page = "0";
-
-    const page2 = document.createElement("div");
-    page2.className = "home-page";
-    page2.dataset.page = "1";
-
-    const widgetHost1 = document.createElement("div");
-    widgetHost1.className = "home-widgets";
-    widgetHost1.innerHTML = this._widgetMarkup("page1");
-    page1.appendChild(widgetHost1);
-
-    const iconRow1 = document.createElement("div");
-    iconRow1.className = "home-icon-grid";
-    page1.appendChild(iconRow1);
-
-    const widgetHost2 = document.createElement("div");
-    widgetHost2.className = "home-widgets page2";
-    widgetHost2.innerHTML = this._widgetMarkup("page2");
-    page2.appendChild(widgetHost2);
-
-    const iconRow2 = document.createElement("div");
-    iconRow2.className = "home-icon-grid";
-    page2.appendChild(iconRow2);
-
-    // Page 1: About + Projects with feature widgets
-    // Page 2: Skills, Contact, Résumé with status widgets
-    const page1Ids = ["about", "projects"];
-    const page2Ids = ["skills", "contact", "resume"];
-
-    const mountIcon = (icon, host) => {
-      const el = document.createElement("div");
-      el.className = "mac-icon";
-      el.tabIndex = 0;
-      el.setAttribute("role", "button");
-      el.dataset.appId = icon.id;
-      el.innerHTML = `
-        <div class="icon-img" aria-hidden="true"><img src="${icon.image}" alt="${icon.label}" /></div>
-        <div class="label-bg">${icon.label}</div>
-      `;
-      el.addEventListener("click", (e) => this._handleIconClick(e, icon));
-      el.addEventListener("dblclick", (e) => this._handleIconDblClick(e, icon));
-      el.addEventListener("keydown", (e) => {
-        if (e.key === "Enter" || e.key === " ") {
-          e.preventDefault();
-          this._handleIconClick(e, icon);
-        }
-      });
-      host.appendChild(el);
-    };
-
-    icons.forEach((icon) => {
-      if (page1Ids.includes(icon.id)) mountIcon(icon, iconRow1);
-      else if (page2Ids.includes(icon.id)) mountIcon(icon, iconRow2);
-      else mountIcon(icon, iconRow1);
-    });
-
-    // Desktop also gets a dedicated desktop-widgets rail (visible on Mac)
-    const desktopWidgets = document.createElement("div");
-    desktopWidgets.className = "desktop-widgets";
-    desktopWidgets.innerHTML = this._widgetMarkup("desktop");
-
-    pages.appendChild(page1);
-    pages.appendChild(page2);
-    this._desktopArea.appendChild(desktopWidgets);
-    this._desktopArea.appendChild(pages);
-    this._pagesEl = pages;
-    this._bindHomePaging();
-    this._updateWidgetClock();
-  }
-
-  _widgetMarkup(scope) {
-    if (scope === "page1" || scope === "desktop") {
-      return `
-        <div class="glass-widget widget-featured" data-open="projects">
-          <div class="glass-widget-kicker">Featured</div>
-          <div class="glass-widget-title">Vertex</div>
-          <div class="glass-widget-body">1st Place CNLC · volunteer matching platform</div>
-        </div>
-        <div class="glass-widget widget-wins">
-          <div class="glass-widget-kicker">Highlights</div>
-          <div class="glass-widget-stat">1st</div>
-          <div class="glass-widget-body">FBLC National · Coding & Programming</div>
-        </div>
-        <div class="glass-widget widget-stack">
-          <div class="glass-widget-kicker">Stack</div>
-          <div class="glass-widget-chips">
-            <span>Python</span><span>JS</span><span>React</span><span>FastAPI</span>
-          </div>
-        </div>
-      `;
-    }
-    // page2
-    return `
-      <div class="glass-widget widget-clock">
-        <div class="glass-widget-kicker" id="widget-clock-date">Today</div>
-        <div class="glass-widget-stat" id="widget-clock-time">--:--</div>
-        <div class="glass-widget-body">Toronto</div>
-      </div>
-      <div class="glass-widget widget-status">
-        <div class="glass-widget-kicker">Status</div>
-        <div class="glass-widget-title">Building</div>
-        <div class="glass-widget-body">Hackathons · DECA · open to collab</div>
-      </div>
-      <div class="glass-widget widget-bio" data-open="about">
-        <div class="glass-widget-kicker">About</div>
-        <div class="glass-widget-body">IB student shipping full-stack tools and mentoring CS / Robotics.</div>
-      </div>
-    `;
-  }
-
-  _updateWidgetClock() {
-    const timeEl = this._root && this._root.querySelector("#widget-clock-time");
-    const dateEl = this._root && this._root.querySelector("#widget-clock-date");
-    const now = new Date();
-    if (timeEl) {
-      timeEl.textContent = now.toLocaleTimeString(undefined, {
-        hour: "numeric",
-        minute: "2-digit",
-      });
-    }
-    if (dateEl) {
-      dateEl.textContent = now.toLocaleDateString(undefined, {
-        weekday: "long",
-        month: "short",
-        day: "numeric",
-      });
-    }
-    setTimeout(() => this._updateWidgetClock(), 20000);
-  }
-
-  _bindHomePaging() {
-    const dots = this._root.querySelector(".ios-page-dots");
-    if (dots) {
-      dots.innerHTML = `<span data-page="0" class="active"></span><span data-page="1"></span>`;
-      dots.querySelectorAll("span").forEach((dot) => {
-        dot.addEventListener("click", () =>
-          this._setHomePage(Number(dot.dataset.page)),
-        );
-      });
-    }
-
-    // Widget taps open apps
-    this._desktopArea.querySelectorAll("[data-open]").forEach((el) => {
-      el.style.cursor = "pointer";
-      el.addEventListener("click", () => this._openAppWindow(el.dataset.open));
-    });
-
-    // Swipe between pages on the pages container
-    let startX = null;
-    let startY = null;
-    const onStart = (e) => {
-      const t = e.touches ? e.touches[0] : e;
-      startX = t.clientX;
-      startY = t.clientY;
-    };
-    const onEnd = (e) => {
-      if (startX == null) return;
-      const t = e.changedTouches ? e.changedTouches[0] : e;
-      const dx = t.clientX - startX;
-      const dy = t.clientY - startY;
-      startX = null;
-      startY = null;
-      if (Math.abs(dx) < 40 || Math.abs(dx) < Math.abs(dy)) return;
-      if (dx < 0) this._setHomePage(Math.min(1, this._homePageIndex + 1));
-      else this._setHomePage(Math.max(0, this._homePageIndex - 1));
-    };
-    if (this._pagesEl) {
-      this._pagesEl.addEventListener("touchstart", onStart, { passive: true });
-      this._pagesEl.addEventListener("touchend", onEnd, { passive: true });
-    }
-  }
-
-  _setHomePage(index) {
-    this._homePageIndex = index;
-    if (!this._pagesEl) return;
-    this._pagesEl.querySelectorAll(".home-page").forEach((p) => {
-      p.classList.toggle("active", Number(p.dataset.page) === index);
-    });
-    this._pagesEl.style.setProperty("--page", String(index));
-    const dots = this._root.querySelectorAll(".ios-page-dots span");
-    dots.forEach((d) =>
-      d.classList.toggle("active", Number(d.dataset.page) === index),
-    );
-  }
-
-  // Dock removed per user request; related handlers pruned.
-
-  _handleIconClick(e, icon) {
-    if (this._isIOSMode()) {
-      this._openAppWindow(icon.id);
-      return;
-    }
-    // Single click just select
-    const already = e.currentTarget.classList.contains("selected");
-    this._desktopArea
-      .querySelectorAll(".mac-icon.selected")
-      .forEach((i) => i.classList.remove("selected"));
-    if (!already) e.currentTarget.classList.add("selected");
-  }
-
-  _handleIconDblClick(e, icon) {
-    this._openAppWindow(icon.id);
-  }
-
-  _openAppWindow(appId) {
-    // Special-case: Projects should not create a window; launch the flow instead
-    if (appId === "projects") {
-      this._launchProjectsFlow();
-      return;
-    }
-    if (this._openWindows.has(appId)) {
-      const data = this._openWindows.get(appId);
-      if (data && data.minimized) {
-        this._restoreWindow(appId);
-      } else {
-        this._focusWindow(appId);
-      }
-      return;
-    }
-    const content = this._getAppContent(appId);
-    const ios = this._isIOSMode();
-    const win = document.createElement("section");
-    win.className = "mac-window" + (ios ? " ios-app" : "");
-    win.dataset.appId = appId;
-    if (ios) {
-      win.innerHTML = `
-        <header class="ios-nav">
-          <button type="button" class="ios-nav-close" data-action="close" aria-label="Close">
-            <span class="ios-chevron" aria-hidden="true"></span>
-            <span>Home</span>
-          </button>
-          <div class="ios-nav-title">${content.title}</div>
-          <div class="ios-nav-spacer"></div>
-        </header>
-        <div class="content" tabindex="0">${content.html}</div>
-      `;
-    } else {
-      win.innerHTML = `
-        <header class="titlebar">
-          <div class="traffic-lights">
-            <span class="close" data-action="close"></span>
-            <span class="minimize" data-action="minimize"></span>
-            <span class="zoom" data-action="zoom"></span>
-          </div>
-          <div class="title">${content.title}</div>
-        </header>
-        <div class="content" tabindex="0">${content.html}</div>
-      `;
-    }
-    this._desktopArea.appendChild(win);
-    if (ios) {
-      win.style.position = "absolute";
-      win.style.left = "0";
-      win.style.top = "0";
-      win.style.width = "100%";
-      win.style.height = "100%";
-    } else {
-      // Set initial inline styles for consistent positioning
-      win.style.position = "absolute";
-      win.style.left = "160px";
-      win.style.top = "120px";
-      win.style.width = "720px";
-      win.style.height = "480px";
-    }
-    requestAnimationFrame(() => win.classList.add("visible"));
-    this._openWindows.set(appId, {
-      el: win,
-      state: ios
-        ? { x: 0, y: 0, w: window.innerWidth, h: window.innerHeight }
-        : {
-            x: 160,
-            y: 120,
-            w: 720,
-            h: 480,
-          },
-    });
-    this._attachWindowEvents(win, appId);
-    this._focusWindow(appId);
-    this._markDockOpen(appId, true);
-    if (ios) {
-      this._root.classList.add("app-open");
-    }
-  }
-
-  _getAppContent(appId) {
-    switch (appId) {
-      case "about":
-        return {
-          title: "About Me",
-          html: `
-            <div class="arc-browser">
-              <aside class="arc-sidebar" aria-label="Arc sidebar">
-                <div class="arc-favorites" role="toolbar" aria-label="Favorites">
-                  <button type="button" class="arc-fav active" data-tab="eddie" title="Eddie">
-                    <img src="assets/image.png" alt="" />
-                  </button>
-                  <button type="button" class="arc-fav" data-tab="stack" title="Stack">
-                    <span class="arc-fav-glyph" style="--c:#7c5cff">{}</span>
-                  </button>
-                  <button type="button" class="arc-fav" data-tab="links" title="Links">
-                    <span class="arc-fav-glyph" style="--c:#2bc8ff">@</span>
-                  </button>
-                  <a class="arc-fav" href="assets/resume.pdf" download title="Résumé">
-                    <span class="arc-fav-glyph" style="--c:#34c759">R</span>
-                  </a>
-                </div>
-
-                <div class="arc-space-title">
-                  <span class="arc-space-swatch"></span>
-                  <span>Portfolio</span>
-                </div>
-
-                <div class="arc-section-label">Pinned</div>
-                <div class="arc-tab-list" role="tablist">
-                  <button type="button" class="arc-tab active" role="tab" aria-selected="true" data-tab="eddie">
-                    <span class="arc-tab-icon"><img src="assets/image.png" alt="" /></span>
-                    <span class="arc-tab-title">Eddie Bian</span>
-                  </button>
-                  <button type="button" class="arc-tab" role="tab" aria-selected="false" data-tab="stack">
-                    <span class="arc-tab-icon glyph" style="--c:#7c5cff">{}</span>
-                    <span class="arc-tab-title">Stack</span>
-                  </button>
-                  <button type="button" class="arc-tab" role="tab" aria-selected="false" data-tab="links">
-                    <span class="arc-tab-icon glyph" style="--c:#2bc8ff">@</span>
-                    <span class="arc-tab-title">Links</span>
-                  </button>
-                </div>
-
-                <div class="arc-divider" aria-hidden="true"></div>
-
-                <div class="arc-section-label">Today</div>
-                <div class="arc-tab-list">
-                  <button type="button" class="arc-tab" role="tab" aria-selected="false" data-tab="now">
-                    <span class="arc-tab-icon glyph" style="--c:#ff5c8a">✦</span>
-                    <span class="arc-tab-title">Now</span>
-                  </button>
-                </div>
-
-                <div class="arc-space-switcher" aria-label="Spaces">
-                  <span class="arc-space-dot active" title="Portfolio"></span>
-                </div>
-              </aside>
-
-              <main class="arc-viewport">
-                <div class="arc-urlbar" aria-hidden="true">
-                  <span class="arc-url-lock"></span>
-                  <span class="arc-url-text">eddiebian.me/about</span>
-                </div>
-
-                <div class="arc-pages">
-                  <article class="arc-page active" data-tab-panel="eddie" role="tabpanel">
-                    <header class="arc-page-hero">
-                      <img class="arc-page-avatar" src="assets/image.png" alt="Eddie Bian" />
-                      <div>
-                        <p class="arc-page-kicker">About</p>
-                        <h1>Eddie Bian</h1>
-                        <p class="arc-page-lead">Competitive programmer and full-stack developer.</p>
-                      </div>
-                    </header>
-                    <p class="arc-page-body">
-                      Grade 11 IB student building tools, shipping hackathon projects, and mentoring DECA, Computer Science, and Robotics teams.
-                    </p>
-                    <dl class="arc-page-meta">
-                      <div><dt>Email</dt><dd><a href="mailto:eddie.bian@yahoo.com">Eddie.bian@yahoo.com</a></dd></div>
-                      <div><dt>Location</dt><dd>Toronto, Ontario</dd></div>
-                      <div><dt>Focus</dt><dd>IB Diploma Program</dd></div>
-                    </dl>
-                  </article>
-
-                  <article class="arc-page" data-tab-panel="stack" role="tabpanel" hidden>
-                    <p class="arc-page-kicker">Stack</p>
-                    <h1>What I build with</h1>
-                    <div class="arc-page-columns">
-                      <section>
-                        <h2>Languages</h2>
-                        <p>Python, JavaScript, Java, C++</p>
-                      </section>
-                      <section>
-                        <h2>Frameworks &amp; tools</h2>
-                        <p>React, FastAPI, Expo, React Native, Git, Supabase</p>
-                      </section>
-                      <section>
-                        <h2>Also using</h2>
-                        <p>Three.js, GSAP, Figma, PostgreSQL</p>
-                      </section>
-                    </div>
-                  </article>
-
-                  <article class="arc-page" data-tab-panel="links" role="tabpanel" hidden>
-                    <p class="arc-page-kicker">Links</p>
-                    <h1>Find me</h1>
-                    <ul class="arc-page-links">
-                      <li><a href="https://github.com/B-Eddie" target="_blank" rel="noopener">GitHub <span>@B-Eddie</span></a></li>
-                      <li><a href="https://www.linkedin.com/in/eddiebian/" target="_blank" rel="noopener">LinkedIn <span>eddiebian</span></a></li>
-                      <li><a href="mailto:eddie.bian@yahoo.com">Email <span>Eddie.bian@yahoo.com</span></a></li>
-                      <li><a href="assets/resume.pdf" download>Résumé <span>PDF</span></a></li>
-                    </ul>
-                  </article>
-
-                  <article class="arc-page" data-tab-panel="now" role="tabpanel" hidden>
-                    <p class="arc-page-kicker">Now</p>
-                    <h1>Currently</h1>
-                    <ul class="arc-page-list">
-                      <li>Training Executive for DECA, Computer Science, and Robotics</li>
-                      <li>Building full-stack apps and hackathon projects</li>
-                      <li>Open to collaboration</li>
-                    </ul>
-                  </article>
-                </div>
-              </main>
-            </div>
-          `,
-        };
-      case "projects":
-        // No window content; handled by _launchProjectsFlow
-        return { title: "Projects", html: `<div></div>` };
-      case "skills":
-        return {
-          title: "Terminal",
-          html: `
-            <div id="terminal-container" style="background: #ffffff; color: #000000; font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', monospace; font-size: 12px; line-height: 1.4; height: 100%; padding: 24px 24px 0; overflow-y: auto; margin: -20px 0 0;">
-              <div id="terminal-output">
-                <div style="margin-bottom: 12px;">
-                  <span style="color: #007aff;">Eddie@MacBook</span>
-                  <span style="color: #000000;"> ~ % </span>
-                  <span style="color: #d73a49;">help</span>
-                </div>
-                <div style="margin-bottom: 12px; color: #6f42c1; font-weight: 600;">Available Commands:</div>
-                <div style="margin-bottom: 8px; margin-left: 16px;">
-                  <span style="color: #d73a49;">skills</span> - Display programming skills and technologies
-                </div>
-                <div style="margin-bottom: 8px; margin-left: 16px;">
-                  <span style="color: #d73a49;">experience</span> - Show work experience and projects
-                </div>
-                <div style="margin-bottom: 8px; margin-left: 16px;">
-                  <span style="color: #d73a49;">contact</span> - Open Contact window
-                </div>
-                <div style="margin-bottom: 8px; margin-left: 16px;">
-                  <span style="color: #d73a49;">clear</span> - Clear the terminal screen
-                </div>
-                <div style="margin-bottom: 8px; margin-left: 16px;">
-                  <span style="color: #d73a49;">neofetch</span> - Show system information (ASCII)
-                </div>
-                <div style="margin-bottom: 8px; margin-left: 16px;">
-                  <span style="color: #d73a49;">whoami</span> - Display user information
-                </div>
-                <div style="margin-bottom: 12px; margin-left: 16px;">
-                  <span style="color: #d73a49;">help</span> - Show this help message
-                </div>
-              </div>
-              <div id="terminal-input-line" style="display: flex; align-items: center;">
-                <span style="color: #007aff;">Eddie@MacBook</span>
-                <span style="color: #000000;"> ~ % </span>
-                <input id="terminal-input" type="text" style="flex: 1; background: transparent; border: none; outline: none; color: #000000; font-family: inherit; font-size: inherit; margin-left: 4px; caret-color: #000000;" placeholder="Type a command..." />
-              </div>
-            </div>
-          `,
-        };
-      case "contact":
-        return {
-          title: "Contacts",
-          html: `
-            <div class="ios-contact">
-              <div class="ios-contact-hero">
-                <img class="ios-contact-avatar" src="assets/image.png" alt="Eddie Bian" />
-                <h1>Eddie Bian</h1>
-                <p class="ios-contact-sub">Grade 11 IB Student</p>
-                <div class="ios-contact-actions">
-                  <a class="ios-contact-action" href="tel:+19058058967">
-                    <span class="ios-contact-action-icon" aria-hidden="true">
-                      <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6.5 4.5h2.2l1.1 3.2-1.4 1.4a12.5 12.5 0 0 0 5.5 5.5l1.4-1.4 3.2 1.1v2.2A2 2 0 0 1 16.5 19 13.5 13.5 0 0 1 3 5.5 2 2 0 0 1 5 3.5h1.5z"/></svg>
-                    </span>
-                    <span>Call</span>
-                  </a>
-                  <a class="ios-contact-action" href="mailto:eddie.bian@yahoo.com">
-                    <span class="ios-contact-action-icon" aria-hidden="true">
-                      <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3.5" y="5.5" width="17" height="13" rx="2"/><path d="m4 7 8 6 8-6"/></svg>
-                    </span>
-                    <span>Mail</span>
-                  </a>
-                  <a class="ios-contact-action" href="https://github.com/B-Eddie" target="_blank" rel="noopener">
-                    <span class="ios-contact-action-icon" aria-hidden="true">
-                      <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M12 2a10 10 0 0 0-3.2 19.5c.5.1.7-.2.7-.5v-1.7c-2.8.6-3.4-1.2-3.4-1.2-.4-1-1-1.3-1-1.3-.9-.6.1-.6.1-.6 1 .1 1.5 1 1.5 1 .9 1.5 2.3 1.1 2.8.8.1-.6.3-1.1.6-1.3-2.2-.2-4.5-1.1-4.5-5a3.9 3.9 0 0 1 1-2.7 3.6 3.6 0 0 1 .1-2.7s.8-.3 2.8 1a9.6 9.6 0 0 1 5 0c2-1.3 2.8-1 2.8-1a3.6 3.6 0 0 1 .1 2.7 3.9 3.9 0 0 1 1 2.7c0 3.9-2.3 4.8-4.5 5 .4.3.7.9.7 1.8v2.6c0 .3.2.6.7.5A10 10 0 0 0 12 2z"/></svg>
-                    </span>
-                    <span>GitHub</span>
-                  </a>
-                  <a class="ios-contact-action" href="https://www.linkedin.com/in/eddiebian/" target="_blank" rel="noopener">
-                    <span class="ios-contact-action-icon" aria-hidden="true">
-                      <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M6.3 9.2H3.6V20h2.7V9.2zM5 3.8a1.6 1.6 0 1 0 0 3.2 1.6 1.6 0 0 0 0-3.2zM20.4 20h-2.7v-5.4c0-1.3 0-3-1.8-3s-2.1 1.4-2.1 2.9V20H11V9.2h2.6v1.5h.1c.4-.7 1.3-1.5 2.7-1.5 2.9 0 3.4 1.9 3.4 4.4V20z"/></svg>
-                    </span>
-                    <span>LinkedIn</span>
-                  </a>
-                </div>
-              </div>
-              <div class="ios-contact-card">
-                <a class="ios-contact-row" href="tel:+19058058967">
-                  <div>
-                    <div class="ios-contact-label">mobile</div>
-                    <div class="ios-contact-value">+1 (905) 805-8967</div>
-                  </div>
-                </a>
-                <a class="ios-contact-row" href="mailto:eddie.bian@yahoo.com">
-                  <div>
-                    <div class="ios-contact-label">email</div>
-                    <div class="ios-contact-value">Eddie.bian@yahoo.com</div>
-                  </div>
-                </a>
-              </div>
-              <div class="ios-contact-card">
-                <a class="ios-contact-row" href="https://github.com/B-Eddie" target="_blank" rel="noopener">
-                  <div>
-                    <div class="ios-contact-label">GitHub</div>
-                    <div class="ios-contact-value">github.com/B-Eddie</div>
-                  </div>
-                </a>
-                <a class="ios-contact-row" href="https://www.linkedin.com/in/eddiebian/" target="_blank" rel="noopener">
-                  <div>
-                    <div class="ios-contact-label">LinkedIn</div>
-                    <div class="ios-contact-value">linkedin.com/in/eddiebian</div>
-                  </div>
-                </a>
-              </div>
-            </div>
-          `,
-        };
-      case "resume":
-        return {
-          title: "Résumé",
-          html: `
-            <div class="resume-root" style="position: relative; inset: 0; height: 100%; width: 100%; background: #ffffff;">
-              <object data="assets/resume.pdf" type="application/pdf" style="width: 100%; height: 100%;">
-                <iframe src="assets/resume.pdf" style="width: 100%; height: 100%; border: none;">
-                </iframe>
-                <div style="padding: 16px; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', system-ui, sans-serif;">
-                  Your browser can't display PDFs here. 
-                  <a href="assets/resume.pdf" target="_blank" rel="noopener">Open the resume</a>.
-                </div>
-              </object>
-            </div>
-          `,
-        };
-      default:
-        return { title: "Info", html: `<h2>Info</h2><p>No content yet.</p>` };
-    }
-  }
-
-  _attachWindowEvents(win, appId) {
-    // Focus on click (including content area)
-    const focusHandler = () => this._focusWindow(appId);
-    win.addEventListener("mousedown", focusHandler);
-
-    // Ensure content area can receive focus and scroll
-    const content = win.querySelector(".content");
-    if (content) {
-      content.addEventListener("mousedown", (e) => {
-        // Allow content to be focused when clicked
-        content.focus();
-        focusHandler();
-      });
-    }
-    // Buttons (Mac traffic lights + iOS nav close)
-    win.querySelectorAll("[data-action]").forEach((btn) => {
-      btn.addEventListener("click", (e) => {
-        e.stopPropagation();
-        const action = e.currentTarget.dataset.action;
-        if (action === "close") this._closeWindow(appId);
-        if (action === "minimize") this._minimizeWindow(appId);
-        if (action === "zoom") this._zoomWindow(appId);
-      });
-    });
-
-    // iOS full-screen apps: no drag / resize
-    if (this._isIOSMode() || win.classList.contains("ios-app")) {
-      return;
-    }
-
-    // Titlebar element and prevent native dragstart (avoids ghost drag jump)
-    const titlebar = win.querySelector(".titlebar");
-    if (titlebar)
-      titlebar.addEventListener("dragstart", (ev) => ev.preventDefault());
-
-    // Dragging (transform-based to avoid layout shifts/jump)
-    let drag = null;
-    const onPointerDown = (e) => {
-      if (e.button !== 0) return;
-      // Only start dragging when pressing on the titlebar background (not the window controls)
-      if (!e.target.closest(".titlebar")) return;
-      if (e.target.closest(".traffic-lights")) return;
+  bind() {
+    $(".skip-link").addEventListener("click", (e) => {
       e.preventDefault();
-      const rect = win.getBoundingClientRect();
-      // starting positions
-      const styleLeft = parseFloat(win.style.left || rect.left) || rect.left;
-      const styleTop = parseFloat(win.style.top || rect.top) || rect.top;
-      drag = {
-        startX: e.clientX,
-        startY: e.clientY,
-        startLeft: styleLeft,
-        startTop: styleTop,
-        rectWidth: rect.width,
-        rectHeight: rect.height,
-        pointerId: e.pointerId,
-        _prevTransition: win.style.transition || "",
-        // capture current computed transform so we can compose our translate
-        baseTransform: getComputedStyle(win).transform || "none",
-        lastLeft: styleLeft,
-        lastTop: styleTop,
-      };
-      // lock inline position to avoid layout recalculation shifting the element
-      win.style.left = `${drag.startLeft}px`;
-      win.style.top = `${drag.startTop}px`;
-      // prepare for transform-based dragging
-      try {
-        if (titlebar && e.pointerId && titlebar.setPointerCapture)
-          titlebar.setPointerCapture(e.pointerId);
-      } catch (err) {}
-      win.style.willChange = "transform";
-      // temporarily disable transform transitions to make dragging immediate
-      win.style.transition = "none";
-      win.classList.add("dragging");
-      // Cursor feedback while dragging
-      try {
-        document.body.style.cursor = "grabbing";
-      } catch (_) {}
-      window.addEventListener("pointermove", onPointerMove);
-      window.addEventListener("pointerup", onPointerUp, { once: true });
-    };
-
-    const onPointerMove = (e) => {
-      if (!drag) return;
-      const dx = e.clientX - drag.startX;
-      const dy = e.clientY - drag.startY;
-      // desired (unclamped) positions
-      let desiredLeft = drag.startLeft + dx;
-      let desiredTop = drag.startTop + dy;
-      // constraints
-      const maxLeft = window.innerWidth - drag.rectWidth;
-      const maxTop = window.innerHeight - drag.rectHeight;
-      desiredLeft = Math.max(0, Math.min(maxLeft, desiredLeft));
-      desiredTop = Math.max(60, Math.min(maxTop, desiredTop)); // account for menubar
-      const translateX = desiredLeft - drag.startLeft;
-      const translateY = desiredTop - drag.startTop;
-      // apply transform composed with any base transform the window had
-      const base =
-        drag.baseTransform && drag.baseTransform !== "none"
-          ? drag.baseTransform + " "
-          : "";
-      win.style.transform = `${base}translate(${translateX}px, ${translateY}px)`;
-      drag.lastLeft = desiredLeft;
-      drag.lastTop = desiredTop;
-    };
-
-    const onPointerUp = () => {
-      if (!drag) return;
-      try {
+      this.show();
+      this.area.focus();
+    });
+    window.addEventListener("blur", () => this.endGesture());
+    this.root.addEventListener("pointerdown", () => { this.suppressClickUntil = 0; }, true);
+    this.root.addEventListener("click", (e) => {
+      if (e.detail > 0 && performance.now() < (this.suppressClickUntil || 0)) {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+      }
+    }, true);
+    this.root.addEventListener("click", (e) => {
+      const opener = e.target.closest("[data-open]");
+      const cmd = e.target.closest("[data-command]");
+      const menu = e.target.closest("[data-menu]");
+      if (opener) {
         if (
-          titlebar &&
-          drag &&
-          drag.pointerId &&
-          titlebar.releasePointerCapture
-        )
-          titlebar.releasePointerCapture(drag.pointerId);
-      } catch (err) {}
-      // commit using the last computed desired positions (avoids parsing transforms)
-      const finalLeft = Math.round(
-        drag.lastLeft != null ? drag.lastLeft : drag.startLeft,
-      );
-      const finalTop = Math.round(
-        drag.lastTop != null ? drag.lastTop : drag.startTop,
-      );
-      // commit without visual jump: set inline left/top, force reflow, then remove transform
-      win.style.left = finalLeft + "px";
-      win.style.top = finalTop + "px";
-      void win.offsetWidth;
-      // remove only the translate we added; since we composed baseTransform + translate,
-      // we can restore baseTransform (if any) or clear transform entirely.
-      if (drag.baseTransform && drag.baseTransform !== "none") {
-        win.style.transform = drag.baseTransform;
-      } else {
-        win.style.transform = "";
-      }
-      requestAnimationFrame(() => {
-        try {
-          win.style.transition = drag._prevTransition || "";
-        } catch (err) {}
-      });
-      win.style.willChange = "";
-      win.classList.remove("dragging");
-      // update stored state
-      const data = this._openWindows.get(appId);
-      if (data) Object.assign(data.state, { x: finalLeft, y: finalTop });
-      drag = null;
-      try {
-        document.body.style.cursor = "";
-      } catch (_) {}
-      window.removeEventListener("pointermove", onPointerMove);
-    };
-    if (titlebar) titlebar.addEventListener("pointerdown", onPointerDown);
-
-    // Resizing by edge (no visible handles) -------------------------------------------------
-    const edgeThreshold = 12; // px - increased for better usability
-    let resizing = null;
-
-    // Hover helper: change cursor when pointer is near an edge so users know
-    // the window is resizable. This applies to all windows.
-    const onWinHover = (e) => {
-      // don't change cursor while actively dragging or resizing
-      if (drag || resizing) return;
-      const rect = win.getBoundingClientRect();
-      const x = e.clientX - rect.left;
-      const y = e.clientY - rect.top;
-      // Use client dimensions to exclude scrollbar area
-      const clientWidth = win.clientWidth;
-      const clientHeight = win.clientHeight;
-      const onLeft = x < edgeThreshold;
-      const onRight = x > clientWidth - edgeThreshold;
-      const onTop = y < edgeThreshold;
-      const onBottom = y > clientHeight - edgeThreshold;
-      let cursor = "";
-      if ((onLeft && onTop) || (onRight && onBottom)) cursor = "nwse-resize";
-      else if ((onRight && onTop) || (onLeft && onBottom))
-        cursor = "nesw-resize";
-      else if (onLeft || onRight) cursor = "ew-resize";
-      else if (onTop || onBottom) cursor = "ns-resize";
-      else cursor = "";
-      win.style.cursor = cursor || "";
-    };
-    const onWinPointerLeave = () => {
-      if (drag || resizing) return;
-      win.style.cursor = "";
-    };
-    win.addEventListener("pointermove", onWinHover);
-    win.addEventListener("pointerleave", onWinPointerLeave);
-
-    const onWinPointerDown = (e) => {
-      if (e.button !== 0) return;
-      // ignore if clicking titlebar (drag) or controls
-      if (e.target.closest(".titlebar")) return;
-      const rect = win.getBoundingClientRect();
-      const x = e.clientX - rect.left;
-      const y = e.clientY - rect.top;
-      // Use client dimensions to exclude scrollbar area for accurate resize detection
-      const clientWidth = win.clientWidth;
-      const clientHeight = win.clientHeight;
-      const onLeft = x < edgeThreshold;
-      const onRight = x > clientWidth - edgeThreshold;
-      const onTop = y < edgeThreshold;
-      const onBottom = y > clientHeight - edgeThreshold;
-      if (!(onLeft || onRight || onTop || onBottom)) return;
-      e.preventDefault();
-      const resizeRect = win.getBoundingClientRect();
-      // Store original styles and DOM position
-      const originalTransition = win.style.transition;
-      const originalBackdropFilter = win.style.backdropFilter;
-      const nextSibling = win.nextSibling;
-      const parent = win.parentNode;
-
-      // Temporarily remove from DOM to isolate from layout interference
-      parent.removeChild(win);
-
-      // Set up for isolated resize
-      win.style.position = "fixed";
-      win.style.left = resizeRect.left + "px";
-      win.style.top = resizeRect.top + "px";
-      win.style.width = resizeRect.width + "px";
-      win.style.height = resizeRect.height + "px";
-      win.style.transform = "none";
-      win.style.transition = "none !important";
-      win.style.backdropFilter = "none";
-      win.style.zIndex = "9999";
-      // Disable content scrolling during resize to prevent layout shifts
-      const content = win.querySelector(".content");
-      if (content) {
-        content.style.overflow = "hidden";
-      }
-
-      // Re-insert at end of body for isolation
-      document.body.appendChild(win);
-
-      resizing = {
-        startX: e.clientX,
-        startY: e.clientY,
-        startRect: resizeRect,
-        onLeft,
-        onRight,
-        onTop,
-        onBottom,
-        minWidth: 240,
-        minHeight: 160,
-        originalTransition,
-        originalBackdropFilter,
-        nextSibling,
-        parent,
-        pointerId: e.pointerId,
-      };
-
-      try {
-        if (win.setPointerCapture) win.setPointerCapture(e.pointerId);
-      } catch (err) {}
-      win.classList.add("resizing");
-      window.addEventListener("pointermove", onResizeMove);
-      window.addEventListener("pointerup", onResizeUp, { once: true });
-    };
-
-    const onResizeMove = (e) => {
-      if (!resizing) return;
-      const dx = e.clientX - resizing.startX;
-      const dy = e.clientY - resizing.startY;
-      let newLeft = resizing.startRect.left;
-      let newTop = resizing.startRect.top;
-      let newWidth = resizing.startRect.width;
-      let newHeight = resizing.startRect.height;
-
-      if (resizing.onLeft) {
-        newLeft = resizing.startRect.left + dx;
-        newWidth = resizing.startRect.width - dx;
-      }
-      if (resizing.onRight) {
-        newWidth = resizing.startRect.width + dx;
-      }
-      if (resizing.onTop) {
-        newTop = resizing.startRect.top + dy;
-        newHeight = resizing.startRect.height - dy;
-      }
-      if (resizing.onBottom) {
-        newHeight = resizing.startRect.height + dy;
-      }
-
-      // Apply constraints
-      newWidth = Math.max(resizing.minWidth, newWidth);
-      newHeight = Math.max(resizing.minHeight, newHeight);
-      newLeft = Math.max(0, Math.min(window.innerWidth - newWidth, newLeft));
-      newTop = Math.max(60, Math.min(window.innerHeight - newHeight, newTop));
-
-      win.style.left = newLeft + "px";
-      win.style.top = newTop + "px";
-      win.style.width = newWidth + "px";
-      win.style.height = newHeight + "px";
-    };
-
-    const onResizeUp = () => {
-      if (!resizing) return;
-
-      // Get final values from fixed positioning
-      const finalLeft = parseFloat(win.style.left);
-      const finalTop = parseFloat(win.style.top);
-      const finalWidth = parseFloat(win.style.width);
-      const finalHeight = parseFloat(win.style.height);
-
-      // Calculate position relative to desktop container
-      const desktopRect = resizing.parent.getBoundingClientRect();
-      const relativeLeft = finalLeft - desktopRect.left;
-      const relativeTop = finalTop - desktopRect.top;
-
-      // Remove from body
-      document.body.removeChild(win);
-
-      // Restore original styles with corrected position
-      win.style.position = "absolute";
-      win.style.left = relativeLeft + "px";
-      win.style.top = relativeTop + "px";
-      win.style.width = finalWidth + "px";
-      win.style.height = finalHeight + "px";
-      win.style.zIndex = "";
-
-      // Restore content scrolling
-      const content = win.querySelector(".content");
-      if (content) {
-        content.style.overflow = "";
-      }
-
-      // Re-insert in original position
-      if (resizing.nextSibling) {
-        resizing.parent.insertBefore(win, resizing.nextSibling);
-      } else {
-        resizing.parent.appendChild(win);
-      }
-
-      // release pointer capture
-      try {
-        if (win.releasePointerCapture && resizing.pointerId)
-          win.releasePointerCapture(resizing.pointerId);
-      } catch (err) {}
-
-      // Force layout and restore original styles
-      void win.offsetWidth;
-      requestAnimationFrame(() => {
-        win.style.transition = resizing?.originalTransition || "";
-        win.style.backdropFilter = resizing?.originalBackdropFilter || "";
-      });
-
-      win.classList.remove("resizing");
-
-      // update stored state
-      const data = this._openWindows.get(appId);
-      if (data)
-        Object.assign(data.state, {
-          x: Math.round(relativeLeft),
-          y: Math.round(relativeTop),
-          w: Math.round(finalWidth),
-          h: Math.round(finalHeight),
-        });
-
-      resizing = null;
-      window.removeEventListener("pointermove", onResizeMove);
-    };
-
-    win.addEventListener("pointerdown", onWinPointerDown);
-
-    // Terminal functionality for skills window
-    if (appId === "skills") {
-      this._initTerminal(win);
-    }
-
-    // About window tab interactions
-    if (appId === "about") {
-      this._initAboutTabs(win);
-    }
-  }
-
-  _initAboutTabs(win) {
-    const tabs = Array.from(
-      win.querySelectorAll(".arc-tab[data-tab], .arc-fav[data-tab]"),
-    );
-    const pages = Array.from(win.querySelectorAll(".arc-page"));
-    const urlText = win.querySelector(".arc-url-text");
-    if (!tabs.length || !pages.length) return;
-
-    const urls = {
-      eddie: "eddiebian.me/about",
-      stack: "eddiebian.me/stack",
-      links: "eddiebian.me/links",
-      now: "eddiebian.me/now",
-    };
-
-    const setActive = (key) => {
-      tabs.forEach((t) => {
-        const on = t.dataset.tab === key;
-        t.classList.toggle("active", on);
-        if (t.getAttribute("role") === "tab") {
-          t.setAttribute("aria-selected", on ? "true" : "false");
+          opener.classList.contains("desktop-file") &&
+          (innerWidth > 760 || matchMedia("(pointer: fine)").matches) &&
+          e.detail === 1
+        ) {
+          $$(".desktop-file").forEach((el) =>
+            el.classList.toggle("selected", el === opener),
+          );
+          return;
         }
-      });
-      pages.forEach((p) => {
-        const on = p.dataset.tabPanel === key;
-        p.classList.toggle("active", on);
-        if (on) p.removeAttribute("hidden");
-        else p.setAttribute("hidden", "");
-      });
-      if (urlText) urlText.textContent = urls[key] || "eddiebian.me";
-    };
-
-    tabs.forEach((tab) => {
-      tab.addEventListener("click", () => setActive(tab.dataset.tab));
+        if (this.desktopRevealed) this.toggleDesktop();
+        this.dismiss();
+        this.open(opener.dataset.open);
+        if (opener.dataset.projectOpen) this.projectDetail(this.windows.get("projects").el, opener.dataset.projectOpen);
+      } else if (cmd) this.command(cmd.dataset.command);
+      else if (menu) this.menu(menu.dataset.menu, menu);
+      else if (!e.target.closest(".os-popover")) {
+        this.closePopover();
+        if (
+          e.target === this.area ||
+          e.target.classList.contains("desktop-wallpaper")
+        ) {
+          $$(".desktop-file").forEach((el) => el.classList.remove("selected"));
+          this.toggleDesktop();
+        }
+      }
     });
-  }
-
-  _initTerminal(win) {
-    const input = win.querySelector("#terminal-input");
-    const output = win.querySelector("#terminal-output");
-    const inputLine = win.querySelector("#terminal-input-line");
-
-    if (!input || !output) return;
-
-    let commandHistory = [];
-    let historyIndex = -1;
-    let currentCommand = "";
-
-    // No custom cursor element; rely on native input caret
-    let cursorInterval = null;
-
-    // Focus input when terminal is clicked
-    win.addEventListener("click", () => {
-      input.focus();
+    this.revealDock(5500);
+    $(".dock-reveal-zone").addEventListener("pointerenter", () =>
+      this.revealDock(),
+    );
+    $(".os-dock").addEventListener("pointerenter", () => this.revealDock());
+    $(".os-dock").addEventListener("pointerleave", () => this.revealDock(650));
+    this.root.addEventListener("contextmenu", (e) => {
+      if (e.target.closest(".os-window, input, textarea, a")) return;
+      e.preventDefault();
+      this.menu("view", null, { x: e.clientX, y: e.clientY });
     });
-
-    // Handle input events
-    input.addEventListener("keydown", (e) => {
+    document.addEventListener("keydown", (e) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        this.spotlight();
+      }
+      if (
+        (e.metaKey || e.ctrlKey) &&
+        e.key.toLowerCase() === "m" &&
+        this.active
+      ) {
+        e.preventDefault();
+        this.minimize(this.active);
+      }
+      if (e.key === "Escape") {
+        this.dismiss();
+        this.closePopover();
+      }
+      if (e.key === "Tab" && !$(".spotlight-backdrop").hidden) {
+        const controls = $$("input, button", $(".spotlight")).filter(
+          (el) => !el.hidden,
+        );
+        const first = controls[0];
+        const last = controls[controls.length - 1];
+        if (e.shiftKey && document.activeElement === first) {
+          e.preventDefault();
+          last.focus();
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault();
+          first.focus();
+        }
+      }
+      if (
+        (e.metaKey || e.ctrlKey) &&
+        e.key.toLowerCase() === "w" &&
+        this.active
+      ) {
+        e.preventDefault();
+        this.close(this.active);
+      }
+    });
+    $(".spotlight-backdrop").addEventListener("click", (e) => {
+      if (e.target.classList.contains("spotlight-backdrop")) this.dismiss();
+    });
+    $(".spotlight input").addEventListener("input", (e) =>
+      this.search(e.target.value),
+    );
+    $(".spotlight input").addEventListener("keydown", (e) => {
+      const rows = $$(".spotlight-result");
+      let index = rows.findIndex((row) =>
+        row.classList.contains("highlighted"),
+      );
+      if (["ArrowDown", "ArrowUp"].includes(e.key)) {
+        e.preventDefault();
+        index =
+          (index + (e.key === "ArrowDown" ? 1 : -1) + rows.length) %
+          rows.length;
+        rows.forEach((row, i) =>
+          row.classList.toggle("highlighted", i === index),
+        );
+        rows[index]?.scrollIntoView({ block: "nearest" });
+      }
       if (e.key === "Enter") {
         e.preventDefault();
-        const command = input.value.trim();
-        if (command) {
-          commandHistory.unshift(command);
-          historyIndex = -1;
-          this._executeCommand(command, output);
-        }
-        input.value = "";
-        currentCommand = "";
-      } else if (e.key === "ArrowUp") {
-        e.preventDefault();
-        if (commandHistory.length > 0) {
-          if (historyIndex < commandHistory.length - 1) {
-            historyIndex++;
-            input.value = commandHistory[historyIndex];
-          }
-        }
-      } else if (e.key === "ArrowDown") {
-        e.preventDefault();
-        if (historyIndex > 0) {
-          historyIndex--;
-          input.value = commandHistory[historyIndex];
-        } else if (historyIndex === 0) {
-          historyIndex = -1;
-          input.value = currentCommand;
-        }
-      } else if (e.key === "Tab") {
-        e.preventDefault();
-        // Basic tab completion for common commands
-        const partial = input.value.toLowerCase();
-        const commands = [
-          "help",
-          "skills",
-          "experience",
-          "contact",
-          "clear",
-          "whoami",
-          "neofetch",
-        ];
-        const match = commands.find((cmd) => cmd.startsWith(partial));
-        if (match) {
-          input.value = match;
-        }
+        (rows[index] || rows[0])?.click();
       }
     });
-
-    input.addEventListener("input", () => {
-      currentCommand = input.value;
+    window.addEventListener("resize", () => {
+      this.endGesture();
+      this.constrainWindows();
+      this.updateDock();
     });
-
-    // Focus input on window focus
-    const focusHandler = () => {
-      setTimeout(() => input.focus(), 100);
-    };
-    win.addEventListener("focus", focusHandler);
-
-    // Clean up on window close
-    const cleanup = () => {
-      if (cursorInterval) clearInterval(cursorInterval);
-    };
-    win.addEventListener("close", cleanup);
-  }
-
-  _executeCommand(command, output) {
-    const cmd = command.toLowerCase().trim();
-    let response = "";
-
-    // Add command to output
-    const commandLine = document.createElement("div");
-    commandLine.style.marginBottom = "8px";
-    commandLine.innerHTML = `<span style="color: #007aff;">Eddie@MacBook</span> <span style="color: #000000;">~ % </span><span style="color: #d73a49;">${command}</span>`;
-    output.appendChild(commandLine);
-
-    // Execute command
-    switch (cmd) {
-      case "help":
-        response = `
-          <div style="color: #6f42c1; font-weight: 600; margin-bottom: 8px;">Available Commands:</div>
-          <div style="margin-left: 16px; margin-bottom: 4px;"><span style="color: #d73a49;">skills</span> - Display programming skills and technologies</div>
-          <div style="margin-left: 16px; margin-bottom: 4px;"><span style="color: #d73a49;">experience</span> - Show work experience and projects</div>
-          <div style="margin-left: 16px; margin-bottom: 4px;"><span style="color: #d73a49;">contact</span> - Open Contact window</div>
-          <div style="margin-left: 16px; margin-bottom: 4px;"><span style="color: #d73a49;">clear</span> - Clear the terminal screen</div>
-          <div style="margin-left: 16px; margin-bottom: 4px;"><span style="color: #d73a49;">whoami</span> - Display user information</div>
-          <div style="margin-left: 16px; margin-bottom: 4px;"><span style="color: #d73a49;">help</span> - Show this help message</div>
-          <div style="margin-left: 16px; margin-bottom: 4px;"><span style="color: #d73a49;">neofetch</span> - Show system information (ASCII)</div>
-        `;
-        break;
-
-      case "skills":
-        response = `
-          <div style="color: #6f42c1; font-weight: 600; margin-bottom: 8px;">Programming Languages:</div>
-          <div style="margin-left: 16px; margin-bottom: 4px;">• JavaScript / TypeScript</div>
-          <div style="margin-left: 16px; margin-bottom: 4px;">• Python</div>
-          <div style="color: #6f42c1; font-weight: 600; margin-bottom: 8px;">Frameworks & Libraries:</div>
-          <div style="margin-left: 16px; margin-bottom: 4px;">• React / Next.js</div>
-          <div style="margin-left: 16px; margin-bottom: 4px;">• Three.js / WebGL</div>
-          <div style="margin-left: 16px; margin-bottom: 4px;">• Node.js / Express</div>
-          <div style="margin-left: 16px; margin-bottom: 8px;">• GSAP</div>
-          <div style="color: #6f42c1; font-weight: 600; margin-bottom: 8px;">Tools & Technologies:</div>
-          <div style="margin-left: 16px; margin-bottom: 4px;">• Git / GitHub</div>
-          <div style="margin-left: 16px; margin-bottom: 4px;">• Docker</div>
-          <div style="margin-left: 16px; margin-bottom: 4px;">• VS Code</div>
-          <div style="margin-left: 16px; margin-bottom: 8px;">• Figma</div>
-          <div style="color: #6f42c1; font-weight: 600; margin-bottom: 8px;">Currently Learning:</div>
-          <div style="margin-left: 16px; margin-bottom: 4px;">• Advanced 3D Graphics</div>
-          <div style="margin-left: 16px; margin-bottom: 4px;">• Machine Learning</div>
-          <div style="margin-left: 16px;">• Cloud Architecture</div>
-        `;
-        break;
-
-      case "experience":
-        response = `
-          <div style="color: #6f42c1; font-weight: 600; margin-bottom: 8px;">Work Experience:</div>
-          <div style="margin-left: 16px; margin-bottom: 8px;">
-            <div style="font-weight: 600; margin-bottom: 4px;">Grade 11 IB Student</div>
-            <div style="color: #666; margin-bottom: 4px;">IB Diploma Program</div>
-            <div>• Developing full-stack web applications</div>
-            <div>• Participating in hackathons and coding competitions</div>
-            <div>• Learning advanced programming concepts</div>
-          </div>
-          <div style="color: #6f42c1; font-weight: 600; margin-bottom: 8px;">Projects:</div>
-          <div style="margin-left: 16px;">
-            <div>• <strong>Personal Portfolio</strong> - Interactive 3D website with macOS desktop simulation</div>
-            <div>• <strong>WebGL Experiments</strong> - 3D graphics and animations</div>
-            <div>• <strong>Full-Stack Applications</strong> - React, Node.js, and database projects</div>
-          </div>
-        `;
-        break;
-
-      case "contact": {
-        // Open or focus the Contact window
-        if (this._openWindows.has("contact")) {
-          this._focusWindow("contact");
-        } else {
-          this._openAppWindow("contact");
-        }
-        response = `<div style="color: #6f42c1;">Opening Contact window…</div>`;
-        break;
-      }
-
-      case "whoami":
-        response = `
-          <div style="margin-left: 16px;">
-            <div style="font-weight: 600; margin-bottom: 4px;">Eddie</div>
-            <div>Grade 11 IB Student</div>
-            <div>IB Diploma Program</div>
-            <div>Passionate Developer & Hackathon Enthusiast</div>
-          </div>
-        `;
-        break;
-
-      case "neofetch":
-        response = `
-          <pre style="font-family: monospace; color: #000; line-height: 1.05; margin: 0;">
-  ____  _                 _               _
- |  _ \\| | ___   ___ __ _| |__  _   _ ___| |__
- | |_) | |/ _ \\ / __/ _\` | '_ \\| | | / __| '_ \\
- |  __/| | (_) | (_| (_| | |_) | |_| \\__ \\ | | |
- |_|   |_|\\___/ \\___\\__,_|_.__/ \\__,_|___/_| |_|
-
-OS: macOS
-Host: MacBook
-Kernel: web-term
-Uptime: 1 min
-Packages: 42
-Shell: web-terminal
-Resolution: ${window.innerWidth}x${window.innerHeight}
-CPU: WebGL (simulated)
-Memory: ${Math.round(
-          performance.memory
-            ? performance.memory.usedJSHeapSize / 1048576
-            : 128,
-        )}MB
-          </pre>
-        `;
-        break;
-
-      case "clear":
-        // Clear all output except the current command line
-        while (output.firstChild) {
-          output.removeChild(output.firstChild);
-        }
-        return; // Don't add response for clear
-
-      default:
-        response = `<div style="color: #d73a49;">Command not found: ${command}</div><div style="color: #666;">Type 'help' to see available commands.</div>`;
+    $("#fast-mode-btn").addEventListener("click", () => this.textVersion());
+    $("#exit-fast-mode").addEventListener("click", () =>
+      this.closeTextVersion(),
+    );
+    $("#fast-mode-back-to-3d").addEventListener("click", () =>
+      this.closeTextVersion(),
+    );
+    window.addEventListener(
+      "scroll",
+      () => {
+        if (
+          intro &&
+          !this.visible &&
+          window.scrollY >=
+            document.documentElement.scrollHeight - innerHeight - 40
+        )
+          this.show();
+      },
+      { passive: true },
+    );
+    if (intro) {
+      const jump = document.createElement("button");
+      jump.className = "skip-intro";
+      jump.textContent = "Enter desktop ↗";
+      jump.addEventListener("click", () => this.show());
+      document.body.append(jump);
     }
-
-    if (response) {
-      const responseDiv = document.createElement("div");
-      responseDiv.style.marginBottom = "12px";
-      responseDiv.innerHTML = response;
-      output.appendChild(responseDiv);
-    }
-
-    // Scroll to bottom (use the scrollable container)
-    const container = output && output.parentElement;
-    if (container) {
-      container.scrollTop = container.scrollHeight;
-    } else if (output) {
-      output.scrollTop = output.scrollHeight;
-    }
-  }
-
-  _focusWindow(appId) {
-    const data = this._openWindows.get(appId);
-    if (!data) return;
-    this._openWindows.forEach((v) => v.el.classList.remove("active"));
-    data.el.classList.add("active");
-    data.el.style.zIndex = (++this._winZ).toString();
-    // Update menubar active app name
-    const appContent = this._getAppContent(appId);
-    const activeAppEl = document.getElementById("menu-active-app");
-    if (activeAppEl) activeAppEl.textContent = appContent.title || "App";
-    // Dock indicator already set when opened; ensure state not lost
-    this._markDockOpen(appId, true);
-  }
-
-  _closeWindow(appId) {
-    const data = this._openWindows.get(appId);
-    if (!data) return;
-    data.el.classList.remove("visible");
-    setTimeout(() => data.el.remove(), 320);
-    this._openWindows.delete(appId);
-    if (!this._isIOSMode()) {
-      this._removeDockItem(appId);
-    }
-    this._markDockOpen(appId, false);
-    // If no windows left, reset active app label
-    if (this._openWindows.size === 0) {
-      const activeAppEl = document.getElementById("menu-active-app");
-      if (activeAppEl) activeAppEl.textContent = "Finder";
-      if (this._root) this._root.classList.remove("app-open");
-    }
-  }
-
-  _minimizeWindow(appId) {
-    if (this._isIOSMode()) {
-      this._closeWindow(appId);
-      return;
-    }
-    const data = this._openWindows.get(appId);
-    if (!data) return;
-    data.el.style.transition = "transform 0.35s ease, opacity 0.35s ease";
-    data.el.style.transformOrigin = "bottom center";
-    data.el.style.transform = "scale(0.1) translateY(400px)";
-    data.el.style.opacity = "0";
-    setTimeout(() => {
-      data.el.style.display = "none";
-      data.minimized = true;
-      this._addDockItem(appId);
-      this._updateDockVisibility();
-    }, 360);
-  }
-
-  _zoomWindow(appId) {
-    const data = this._openWindows.get(appId);
-    if (!data) return;
-    const maximized = data.el.classList.toggle("zoomed");
-    if (maximized) {
-      // Save current state
-      data.prevState = { ...data.state };
-      // Maximize window
-      data.state.x = window.innerWidth * 0.05;
-      data.state.y = 60;
-      data.state.w = window.innerWidth * 0.9;
-      data.state.h = window.innerHeight - 110;
-
-      data.el.style.left = data.state.x + "px";
-      data.el.style.top = data.state.y + "px";
-      data.el.style.width = data.state.w + "px";
-      data.el.style.height = data.state.h + "px";
-    } else if (data.prevState) {
-      // Restore previous state
-      data.state = { ...data.prevState };
-      data.el.style.left = data.state.x + "px";
-      data.el.style.top = data.state.y + "px";
-      data.el.style.width = data.state.w + "px";
-      data.el.style.height = data.state.h + "px";
-      delete data.prevState;
-    }
-  }
-
-  _markDockOpen(appId, open) {
-    // No-op for highlighting open apps; we only show minimized ones
-  }
-
-  _launchProjectsFlow() {
-    // Hide the desktop overlay, then drive the 3D zoom and show projects panel
-    this.hide();
-    // Prevent page scroll so the desktop overlay won't reappear during projects view
-    const prevBodyOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    try {
-      if (window.app && window.app.animationManager) {
-        const anim = window.app.animationManager;
-        const runner = anim.moveDownThenEngulf
-          ? "moveDownThenEngulf"
-          : anim.zoomOutRotateAndZoomIn
-            ? "zoomOutRotateAndZoomIn"
-            : "zoomToNotebook";
-        anim[runner](() => {
-          const existing = document.getElementById("projects-overlay-panel");
-          if (existing) existing.remove();
-          // Ensure handwriting font is loaded
-          if (!document.getElementById("handwritten-font")) {
-            const link = document.createElement("link");
-            link.id = "handwritten-font";
-            link.rel = "stylesheet";
-            link.href =
-              "https://fonts.googleapis.com/css2?family=Caveat:wght@500;700&family=Patrick+Hand&display=swap";
-            document.head.appendChild(link);
-          }
-
-          const panel = document.createElement("div");
-          panel.id = "projects-overlay-panel";
-          panel.style.position = "fixed";
-          panel.style.inset = "0"; // full-screen overlay, background stays as 3D notebook
-          panel.style.background = "transparent";
-          panel.style.color = "#111";
-          panel.style.zIndex = "12";
-          panel.style.pointerEvents = "auto";
-          panel.innerHTML = `
-            <style>
-              #projects-overlay-panel {
-                font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
-                --glass: rgba(255,255,255,0.22);
-                --glass-border: rgba(255,255,255,0.4);
-              }
-              #projects-overlay-panel .hand-header {
-                position: fixed; top: max(12px, env(safe-area-inset-top)); left: 16px; right: 16px;
-                display: flex; align-items: center; justify-content: space-between;
-                z-index: 2; pointer-events: none;
-              }
-              #projects-overlay-panel .hand-title {
-                font-size: clamp(22px, 4vw, 34px);
-                font-weight: 700; letter-spacing: -0.03em;
-                color: #fff;
-                text-shadow: 0 2px 12px rgba(0,0,0,0.35);
-              }
-              #projects-overlay-panel .hand-actions { pointer-events: auto; }
-              #projects-overlay-panel .hand-btn {
-                background: rgba(255,255,255,0.22);
-                backdrop-filter: blur(24px) saturate(180%);
-                -webkit-backdrop-filter: blur(24px) saturate(180%);
-                border: 1px solid rgba(255,255,255,0.45);
-                border-radius: 999px;
-                padding: 10px 16px; cursor: pointer; font-weight: 600; font-size: 14px;
-                color: #fff;
-                box-shadow: inset 0 1px 0 rgba(255,255,255,0.55), 0 8px 24px rgba(0,0,0,0.2);
-              }
-              #projects-overlay-panel .hand-notes {
-                position: fixed; inset: 0;
-                z-index: 1;
-                overflow-y: auto;
-                -webkit-overflow-scrolling: touch;
-                padding: 84px 16px calc(28px + env(safe-area-inset-bottom));
-                display: grid;
-                grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-                gap: 16px;
-                align-content: start;
-                pointer-events: auto;
-              }
-              #projects-overlay-panel .note-card {
-                position: relative;
-                width: 100%;
-                left: auto !important; top: auto !important;
-                background: rgba(255,255,255,0.16);
-                backdrop-filter: blur(28px) saturate(180%);
-                -webkit-backdrop-filter: blur(28px) saturate(180%);
-                border: 1px solid rgba(255,255,255,0.4);
-                border-radius: 22px;
-                padding: 14px;
-                box-shadow: inset 0 1px 0 rgba(255,255,255,0.5), 0 12px 32px rgba(0,0,0,0.2);
-                color: #fff;
-                cursor: pointer;
-                transform: none !important;
-                transition: transform 0.15s ease, box-shadow 0.15s ease;
-              }
-              #projects-overlay-panel .note-card:hover,
-              #projects-overlay-panel .note-card.open {
-                transform: translateY(-2px) !important;
-                box-shadow: inset 0 1px 0 rgba(255,255,255,0.6), 0 16px 40px rgba(0,0,0,0.28);
-              }
-              #projects-overlay-panel .note-title { font-size: 20px; font-weight: 700; margin-bottom: 6px; letter-spacing: -0.02em; }
-              #projects-overlay-panel .note-body { font-size: 14px; line-height: 1.3; opacity: 0.9; }
-              #projects-overlay-panel .note-body a { color: #dff5ff; }
-              #projects-overlay-panel .note-img {
-                width: 100%; height: 140px; object-fit: cover; display: block; margin-bottom: 10px;
-                background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.25); border-radius: 14px;
-              }
-              #projects-overlay-panel .note-desc {
-                display: none; margin-top: 8px; font-size: 14px; line-height: 1.35; opacity: 0.95;
-              }
-              #projects-overlay-panel .note-card.open .note-desc,
-              #projects-overlay-panel .note-card:hover .note-desc { display: block; }
-              @media (max-width: 820px) {
-                #projects-overlay-panel .hand-notes {
-                  grid-template-columns: 1fr;
-                  padding-top: 92px;
-                }
-                #projects-overlay-panel .note-img { height: 160px; }
-              }
-              @media (min-width: 821px) {
-                #projects-overlay-panel .hand-notes {
-                  padding: 96px 48px 48px;
-                  grid-template-columns: repeat(2, minmax(0, 1fr));
-                  max-width: 980px;
-                  margin: 0 auto;
-                  left: 0; right: 0;
-                }
-              }
-            </style>
-            <div class="hand-header">
-              <div class="hand-title">Projects</div>
-              <div class="hand-actions">
-                <button id="projects-overlay-back" class="hand-btn">Go Back</button>
-              </div>
-            </div>
-            <div class="hand-notes">
-              <div class="note-card" data-project="vertex">
-                <img class="note-img" src="assets/vertex.png" alt="Vertex preview" />
-                <div class="note-title">Vertex</div>
-                <div class="note-body"><a href="https://fblc-26.vercel.app/" target="_blank" rel="noopener noreferrer">fblc-26.vercel.app</a></div>
-                <div class="note-desc">1st Place CNLC winner. Platform connecting high school students with volunteer opportunities.</div>
-              </div>
-              <div class="note-card" data-project="Tangenai">
-                <img class="note-img" src="assets/tangenai.png" alt="Tangen AI preview" />
-                <div class="note-title">Tangen AI</div>
-                <div class="note-body"><a href="https://tangenai.work" target="_blank" rel="noopener noreferrer">tangenai.work</a></div>
-                <div class="note-desc">AI-powered stock scorer. Sentiment analysis combined with key metrics.</div>
-              </div>
-              <div class="note-card" data-project="ragnohacks">
-                <img class="note-img" src="assets/ragno.png" alt="RagnoHacks preview" />
-                <div class="note-title">RagnoHacks</div>
-                <div class="note-body"><a href="https://ragnohacks.ca/old" target="_blank" rel="noopener noreferrer">ragnohacks.ca</a></div>
-                <div class="note-desc">Hackathon website.</div>
-              </div>
-              <div class="note-card" data-project="healthhub">
-                <img class="note-img" src="assets/fblc.png" alt="HealthHub preview" />
-                <div class="note-title">HealthHub</div>
-                <div class="note-body"><a href="https://github.com/B-Eddie/fblc" target="_blank" rel="noopener noreferrer">github.com/B-Eddie/fblc</a></div>
-                <div class="note-desc">Provider app for online booking.</div>
-              </div>
-            </div>
-          `;
-          document.body.appendChild(panel);
-          const backBtn = panel.querySelector("#projects-overlay-back");
-          if (backBtn) {
-            backBtn.addEventListener("click", () => {
-              try {
-                if (
-                  window.app &&
-                  window.app.animationManager &&
-                  window.app.animationManager.timeline &&
-                  window.app.animationManager.timeline.scrollTrigger
-                ) {
-                  window.app.animationManager.timeline.scrollTrigger.enable();
-                }
-              } catch (_) {}
-              if (window.macDesktop) window.macDesktop.show();
-              panel.remove();
-              document.body.style.overflow = prevBodyOverflow || "";
-            });
-          }
-          // Toggle description on note click; only one open at a time
-          const cards = panel.querySelectorAll(".note-card");
-          cards.forEach((card) => {
-            card.addEventListener("click", (e) => {
-              // Ignore clicks on header buttons
-              if (e.target.closest("#projects-overlay-back")) return;
-              // Allow anchor clicks without toggling the card
-              if (e.target.closest("a")) return;
-              cards.forEach((c) => {
-                if (c !== card) c.classList.remove("open");
-              });
-              card.classList.toggle("open");
-            });
-          });
-        });
-      } else {
-        console.warn("Animation manager not available to zoom to notebook.");
-      }
-    } catch (err) {
-      console.error("Failed to launch projects flow", err);
-      document.body.style.overflow = prevBodyOverflow || "";
-    }
-  }
-
-  _restoreWindow(appId) {
-    const data = this._openWindows.get(appId);
-    if (!data) return;
-    data.minimized = false;
-    const el = data.el;
-    el.style.display = "block";
-    // Animate back to normal
-    el.style.transition = "transform 0.28s ease, opacity 0.28s ease";
-    el.style.transformOrigin = "bottom center";
-    // Force reflow to ensure transition applies
-    void el.offsetWidth;
-    el.style.transform = "scale(1) translateY(0)";
-    el.style.opacity = "1";
-    setTimeout(() => {
-      el.style.transition = "";
-    }, 300);
-    this._removeDockItem(appId);
-    this._updateDockVisibility();
-    this._focusWindow(appId);
-  }
-
-  _buildIOSDock() {
-    if (!this._dockEl) return;
-    this._dockEl.innerHTML = "";
-    const dockApps = ["about", "projects", "skills", "contact"];
-    dockApps.forEach((appId) => {
-      const meta = (this._appMeta && this._appMeta[appId]) || { label: appId };
-      const btn = document.createElement("button");
-      btn.className = "dock-item ios-dock-item";
-      btn.type = "button";
-      btn.dataset.appId = appId;
-      btn.setAttribute("role", "menuitem");
-      btn.title = meta.title || meta.label || appId;
-      btn.innerHTML = `
-        <span class="dock-icon">${
-          meta.image ? `<img src="${meta.image}" alt="">` : ""
-        }</span>
-      `;
-      btn.addEventListener("click", () => this._openAppWindow(appId));
-      this._dockEl.appendChild(btn);
-    });
-    this._dockEl.style.display = "flex";
-    if (this._root) this._root.classList.add("has-dock");
-  }
-
-  _clearIOSDock() {
-    if (!this._dockEl || !this._root) return;
-    if (this._dockEl.querySelector(".ios-dock-item")) {
-      this._dockEl.innerHTML = "";
-      this._dockEl.style.display = "none";
-      this._root.classList.remove("has-dock");
-    }
-  }
-
-  _addDockItem(appId) {
-    if (!this._dockEl || this._isIOSMode()) return;
-    const existing = this._dockEl.querySelector(`[data-app-id="${appId}"]`);
-    if (existing) return;
-    const meta = (this._appMeta && this._appMeta[appId]) || { label: appId };
-    const btn = document.createElement("button");
-    btn.className = "dock-item";
-    btn.type = "button";
-    btn.dataset.appId = appId;
-    btn.setAttribute("role", "menuitem");
-    btn.title = meta.title || meta.label || appId;
-    btn.innerHTML = `
-      <span class="dock-icon">${
-        meta.image ? `<img src="${meta.image}" alt="">` : ""
-      }</span>
-      <span class="dock-label">${meta.label || appId}</span>
-    `;
-    btn.addEventListener("click", () => this._restoreWindow(appId));
-    this._dockEl.appendChild(btn);
-  }
-
-  _removeDockItem(appId) {
-    if (!this._dockEl || this._isIOSMode()) return;
-    const el = this._dockEl.querySelector(`[data-app-id="${appId}"]`);
-    if (el) el.remove();
-  }
-
-  _updateDockVisibility() {
-    if (!this._dockEl) return;
-    if (this._isIOSMode()) {
-      this._dockEl.style.display = "flex";
-      if (this._root) this._root.classList.add("has-dock");
-      return;
-    }
-    const hasItems = this._dockEl.children.length > 0;
-    this._dockEl.style.display = hasItems ? "flex" : "none";
-    if (this._root) {
-      this._root.classList.toggle("has-dock", hasItems);
-    }
-  }
-
-  _bindGlobal() {
-    window.addEventListener("scroll", () => this._onScroll());
-    document.addEventListener("keydown", (e) => {
-      if (e.key === "Escape" && this._visible) this.hide();
-    });
-  }
-
-  _onScroll() {
-    const now = performance.now();
-    if (now - this._lastScrollCheck < this.options.throttleMs) {
-      // Still update idle timer so appearance waits for full idle period
-      this._scheduleIdleCheck();
-      return;
-    }
-    this._lastScrollCheck = now;
-    const progress = this._getScrollProgress();
-    const nearBottom = this._nearBottom();
-
-    if (!this._visible) {
-      // Only consider showing when BOTH threshold & bottom proximity satisfied
-      if (progress >= this.options.appearScrollProgress && nearBottom) {
-        this._scheduleIdleCheck();
-      }
-    } else {
-      // Hide early when user scrolls back up beyond disappear threshold OR leaves bottom zone
-      if (progress < this.options.disappearThreshold || !nearBottom) {
-        this.hide();
-      }
-    }
-  }
-
-  _scheduleIdleCheck() {
-    clearTimeout(this._idleTimer);
-    this._idleTimer = setTimeout(() => {
-      // Re-evaluate conditions at idle time
-      const progress = this._getScrollProgress();
-      if (
-        !this._visible &&
-        progress >= this.options.appearScrollProgress &&
-        this._nearBottom()
-      ) {
-        this.show();
-      }
-    }, this.options.appearAfterIdleMs);
-  }
-
-  _nearBottom() {
-    const scrollTop = window.scrollY || document.documentElement.scrollTop;
-    const remaining =
-      document.documentElement.scrollHeight - window.innerHeight - scrollTop;
-    return remaining <= this.options.requireBottomProximityPx;
-  }
-
-  _getScrollProgress() {
-    const scrollTop = window.scrollY || document.documentElement.scrollTop;
-    const docHeight =
-      document.documentElement.scrollHeight - window.innerHeight;
-    return docHeight > 0 ? scrollTop / docHeight : 0;
   }
 
   show() {
-    if (!this._root) return;
-    this._visible = true;
-    this._root.style.opacity = "1";
-    this._savedScrollFreezeY =
-      window.scrollY || document.documentElement.scrollTop || 0;
-    this._enableScrollIntercept();
-    setTimeout(() => {
-      if (this._visible) this._root.style.pointerEvents = "auto";
-    }, this.options.transitionDelayMs);
+    if (this.visible) return;
+    this.visible = true;
+    window.app?.animationManager?.destroy();
+    window.app?.pause();
+    window.scrollTo(0, 0);
+    document.body.classList.add("desktop-ready");
+    document.body.classList.remove("is-loading");
+    this.root.classList.add("visible");
+    this.root.inert = false;
+    this.closeTextVersion();
+    this.revealDock(5500);
+    if (intro && !this.windows.size) this.open("about", { initial: true });
   }
 
-  hide() {
-    if (!this._root) return;
-    this._visible = false;
-    this._root.style.opacity = "0";
-    this._root.style.pointerEvents = "none";
-    this._disableScrollIntercept();
-  }
-
-  _enableScrollIntercept() {
-    if (this._intercepting) return;
-    this._intercepting = true;
-    this._upIntent = 0;
-    this._wheelHandler = (e) => this._onInterceptWheel(e);
-    this._touchStartHandler = (e) => this._onTouchStart(e);
-    this._touchMoveHandler = (e) => this._onTouchMove(e);
-    this._keyHandler = (e) => this._onKeyScroll(e);
-    window.addEventListener("wheel", this._wheelHandler, { passive: false });
-    window.addEventListener("touchstart", this._touchStartHandler, {
-      passive: false,
-    });
-    window.addEventListener("touchmove", this._touchMoveHandler, {
-      passive: false,
-    });
-    window.addEventListener("keydown", this._keyHandler, true);
-  }
-
-  _disableScrollIntercept() {
-    if (!this._intercepting) return;
-    window.removeEventListener("wheel", this._wheelHandler, { passive: false });
-    window.removeEventListener("touchstart", this._touchStartHandler, {
-      passive: false,
-    });
-    window.removeEventListener("touchmove", this._touchMoveHandler, {
-      passive: false,
-    });
-    window.removeEventListener("keydown", this._keyHandler, true);
-    this._intercepting = false;
-  }
-
-  _onInterceptWheel(e) {
-    if (!this._visible) return; // safety
-
-    // Check if the scroll event originated from within a window's content area
-    const target = e.target;
-    const isInWindowContent = target.closest(".mac-window .content") !== null;
-
-    if (isInWindowContent) {
-      // Allow scroll events within window content to pass through
+  open(id, options = {}) {
+    if (!apps.some((app) => app.id === id)) return;
+    const existing = this.windows.get(id);
+    if (existing) {
+      existing.minimizeAnimation?.cancel();
+      existing.minimizing = false;
+      existing.el.hidden = false;
+      existing.minimized = false;
+      existing.revealHidden = false;
+      this.focus(id);
       return;
     }
-
-    // Freeze background position
-    if (typeof this._savedScrollFreezeY === "number") {
-      if (window.scrollY !== this._savedScrollFreezeY)
-        window.scrollTo(0, this._savedScrollFreezeY);
+    const meta = apps.find((app) => app.id === id);
+    const win = document.createElement("section");
+    win.className = `os-window window-${id}`;
+    win.dataset.app = id;
+    win.setAttribute("role", "region");
+    win.setAttribute("aria-label", `${meta.name} window`);
+    win.tabIndex = -1;
+    win.innerHTML = `<header class="window-titlebar"><div class="window-controls"><button class="traffic close" aria-label="Close ${meta.name}">×</button><button class="traffic minimize" aria-label="Minimize ${meta.name}">−</button><button class="traffic maximize" aria-label="Maximize ${meta.name}">⤢</button></div><div class="window-title">${id === "about" ? "Eddie Bian — Arc" : `${symbol(id === "projects" ? "folder" : id === "terminal" ? "code" : "grid")} ${meta.name}`}</div><span class="window-title-extra">${id === "about" ? "⌁" : ""}</span></header><div class="window-body">${this.content(id)}</div><button class="window-resize" tabindex="-1" aria-label="Resize window"></button>`;
+    if (id === "about") {
+      $(".window-title", win).remove();
+      $(".window-title-extra", win).remove();
+      $(".window-titlebar", win).insertAdjacentHTML("beforeend", `<div class="arc-toolbar"><button data-arc="sidebar" aria-label="Hide sidebar">◧</button><button data-arc="back" aria-label="Back" disabled>‹</button><button data-arc="forward" aria-label="Forward" disabled>›</button><button data-arc="reload" aria-label="Reload page">↻</button></div>`);
     }
-    const dy = e.deltaY;
-    if (dy < 0) {
-      this._upIntent += Math.abs(dy);
-      if (this._upIntent >= this.options.unlockUpIntentPx) {
-        this.hide();
-        return; // allow natural scroll after hide
-      }
-    }
-    e.preventDefault();
+    this.area.append(win);
+    const compact = innerWidth <= 760;
+    const width = Math.min(
+      id === "projects"
+        ? 900
+        : id === "about"
+          ? 900
+          : id === "contact"
+            ? 720
+            : id === "game"
+              ? 480
+              : 650,
+      innerWidth - 48,
+    );
+    const height = Math.min(
+      id === "about"
+        ? 660
+        : id === "projects"
+          ? 610
+          : id === "contact"
+            ? 560
+            : id === "game"
+              ? 610
+              : 530,
+      innerHeight - (this.autoHideDock ? 100 : 160),
+    );
+    const offset = options.initial ? 0 : (this.windows.size % 4) * 22;
+    const x =
+      options.initial && innerWidth > 1100
+        ? Math.min(326, innerWidth - width - 155)
+        : (innerWidth - width) / 2 + offset;
+    const y = Math.min(
+      options.initial
+        ? Math.max(30, (innerHeight - height - 80) / 2)
+        : Math.max(32, (innerHeight - height - 100) / 2) + offset,
+      Math.max(12, innerHeight - height - (this.autoHideDock ? 60 : 124)),
+    );
+    Object.assign(win.style, {
+      left: `${Math.max(12, x)}px`,
+      top: `${y}px`,
+      width: `${width}px`,
+      height: `${height}px`,
+    });
+    this.windows.set(id, {
+      el: win,
+      x: Math.max(12, x),
+      y,
+      width,
+      height,
+      createdCompact: compact,
+    });
+    $(".close", win).addEventListener("click", () => this.close(id));
+    $(".minimize", win).addEventListener("click", () => this.minimize(id));
+    $(".maximize", win).addEventListener("click", () => this.maximize(id));
+    $(".window-titlebar", win).addEventListener("dblclick", (e) => {
+      if (!e.target.closest("button")) this.maximize(id);
+    });
+    win.addEventListener("pointerdown", () => this.focus(id, false));
+    win.addEventListener("focusin", () => this.focus(id, false));
+    this.drag(win, id);
+    this.resize(win, id);
+    this.setupApp(id, win);
+    this.focus(id, !options.initial);
+    if (compact) this.area.scrollTop = 0;
+    this.updateDock();
   }
 
-  _onTouchStart(e) {
-    this._touchStartY =
-      e.touches && e.touches.length ? e.touches[0].clientY : null;
-  }
-  _onTouchMove(e) {
-    if (!this._visible) return;
-    if (this._touchStartY == null) return;
-
-    // Check if the touch event originated from within a window's content area
-    const target = e.target;
-    const isInWindowContent = target.closest(".mac-window .content") !== null;
-
-    if (isInWindowContent) {
-      // Allow touch events within window content to pass through
-      return;
+  content(id) {
+    switch (id) {
+      case "about":
+        return welcomeContent();
+      case "projects":
+        return projectsContent();
+      case "contact":
+        return contactContent();
+      case "terminal":
+        return `<div class="terminal-app"><div class="terminal-output" role="log" aria-live="polite"><p class="terminal-muted">Last login: just now, from somewhere on the internet</p><div class="terminal-banner"><pre aria-hidden="true">  ___   ___   ___   _   ___
+ / _ \\ / _ \\ / _ \\ | | / _ \\
+|  __/| | | | | | || ||  __/
+ \\___||_| |_| |_|_||_| \\___|</pre><p><strong>eddieOS</strong> v1.0<br>A tiny shell. A lot of curiosity.</p></div><p>Welcome in. Try <button class="terminal-suggestion" data-term="help">help</button>, <button class="terminal-suggestion" data-term="skills">skills</button>, or <button class="terminal-suggestion" data-term="neofetch">neofetch</button>.</p></div><form class="terminal-prompt"><label for="terminal-command"><span>eddie</span><b>~</b> ❯</label><input id="terminal-command" aria-label="Terminal command" autocomplete="off" autocapitalize="off" spellcheck="false"/></form></div>`;
+      case "notes":
+        return `<div class="notes-app"><aside><p>On this desktop</p><button class="selected">A little scratchpad<small>Just for your visit</small></button><span>${symbol("book")} Notes stay in this browser</span></aside><div class="note-editor"><div class="note-editor-toolbar"><span>Personal note</span><span class="save-status" role="status">Saved locally</span></div><label for="personal-note">A little scratchpad</label><textarea id="personal-note" spellcheck="false" aria-label="Personal note"></textarea><div class="note-editor-footer">Leave an idea. Make a list. Write a terrible haiku.<button class="text-button" data-command="reset-note">Reset note</button></div></div></div>`;
+      case "settings":
+        return `<div class="settings-app"><p class="eyebrow">Make yourself at home</p><h1>Wallpaper</h1><p>Choose a wallpaper for Eddie’s desktop.</p><div class="wallpaper-options">${["alpine", "forest", "dusk"].map((name, i) => `<button data-wallpaper="${name}" aria-pressed="${this.wallpaper === name}"><span class="wallpaper-preview ${name}"></span><strong>${["Alpine daydream", "Forest friend", "After hours"][i]}</strong><small>${["A little mountain air", "The original Totoro wallpaper", "For the late-night builders"][i]}</small><i>${symbol("check")}</i></button>`).join("")}</div><div class="setting-row"><div><strong>Desktop Widgets</strong><span>Show the clock and Notes widget.</span></div><button class="toggle" role="switch" aria-checked="${this.widgets}" aria-label="Desktop widgets" data-command="widgets"><span></span></button></div><div class="setting-row"><div><strong>Automatically Hide Dock</strong><span>Move the pointer to the bottom edge to reveal it.</span></div><button class="toggle" role="switch" aria-checked="${this.autoHideDock}" aria-label="Automatically Hide Dock" data-command="autohide"><span></span></button></div><div class="settings-footnote">Preferences are saved on this device.</div></div>`;
+      case "resume":
+        return `<div class="resume-toolbar"><span>Eddie Bian · Résumé</span><a href="assets/resume.pdf" target="_blank" rel="noopener">Open PDF ↗</a><a href="assets/resume.pdf" download>Download ↓</a></div><object class="resume-viewer" data="assets/resume.pdf" type="application/pdf" aria-label="Eddie Bian résumé"><p>Your browser can’t preview this PDF. <a href="assets/resume.pdf">Read or download the résumé</a>.</p></object>`;
+      case "game":
+        return `<div class="game-app"><span class="game-eyebrow">A small reset for your brain</span><h1>Take a tiny break.</h1><p>Find the pairs. No leaderboard. No pressure.</p><div class="game-score"><span>Moves <strong class="game-moves">0</strong></span><span>Pairs <strong class="game-pairs">0 / 8</strong></span><button class="text-button game-restart">Start over ↻</button></div><div class="memory-grid" aria-label="Memory game"></div><p class="game-message" role="status" aria-live="polite">Pick any two cards to get started.</p></div>`;
+      default:
+        return "";
     }
-
-    const currentY =
-      e.touches && e.touches.length ? e.touches[0].clientY : null;
-    if (currentY == null) return;
-    const dy = currentY - this._touchStartY; // positive when swiping down (scroll up intent)
-    if (dy > 0) {
-      this._upIntent += dy;
-      this._touchStartY = currentY; // incremental
-      if (this._upIntent >= this.options.unlockUpIntentPx) {
-        this.hide();
-        return;
-      }
-    }
-    // prevent any movement while visible
-    e.preventDefault();
   }
 
-  _onKeyScroll(e) {
-    if (!this._visible) return;
-
-    // Check if the keyboard event originated from within a window's content area
-    const target = e.target;
-    const isInWindowContent = target.closest(".mac-window .content") !== null;
-
-    if (isInWindowContent) {
-      // Allow keyboard events within window content to pass through
-      return;
+  setupApp(id, win) {
+    if (id === "about") {
+      const history = ["home"];
+      let historyIndex = 0;
+      const select = (name, push = true) => {
+        if (push && history[historyIndex] !== name) {
+          history.splice(historyIndex + 1);
+          history.push(name);
+          historyIndex++;
+        }
+        $$("[data-about-tab]", win).forEach((tab) => {
+          const selected = tab.dataset.aboutTab === name;
+          tab.classList.toggle("selected", selected);
+          tab.setAttribute("aria-pressed", selected);
+        });
+        $$("[data-panel]", win).forEach((panel) => panel.hidden = panel.dataset.panel !== name);
+        $('[data-arc="back"]', win).disabled = historyIndex === 0;
+        $('[data-arc="forward"]', win).disabled = historyIndex === history.length - 1;
+        $(".arc-address-label", win).textContent = name === "home" ? "eddiebian.me" : `eddiebian.me/${name}`;
+      };
+      $$("[data-about-tab]", win).forEach((button) => button.addEventListener("click", () => select(button.dataset.aboutTab)));
+      $$("[data-arc]", win).forEach((button) => button.addEventListener("click", () => {
+        switch (button.dataset.arc) {
+          case "back": select(history[--historyIndex], false); break;
+          case "forward": select(history[++historyIndex], false); break;
+          case "reload": $(".arc-panel:not([hidden])", win).scrollTo({ top: 0 }); break;
+          case "sidebar": {
+            const hidden = win.classList.toggle("sidebar-hidden");
+            button.setAttribute("aria-label", hidden ? "Show sidebar" : "Hide sidebar");
+            break;
+          }
+        }
+      }));
+      select("home", false);
     }
-
-    const keysUp = ["ArrowUp", "PageUp", "Home", "k"]; // include vim-like k optionally
-    if (keysUp.includes(e.key)) {
-      this._upIntent += 40; // arbitrary increment
-      if (this._upIntent >= this.options.unlockUpIntentPx) {
-        this.hide();
-        return;
-      }
+    if (id === "projects") {
+      $$("[data-project-view]", win).forEach((button) =>
+        button.addEventListener("click", () => {
+          $(".project-grid", win).classList.toggle(
+            "list-view",
+            button.dataset.projectView === "list",
+          );
+          $$("[data-project-view]", win).forEach((el) => {
+            el.classList.toggle("selected", el === button);
+            el.setAttribute("aria-pressed", el === button);
+          });
+        }),
+      );
+      let filter = "all";
+      let query = "";
+      const render = () => this.renderProjects(win, filter, query);
+      $$("[data-filter]", win).forEach((button) =>
+        button.addEventListener("click", () => {
+          filter = button.dataset.filter;
+          $$("[data-filter]", win).forEach((el) =>
+            el.classList.toggle("selected", el === button),
+          );
+          render();
+        }),
+      );
+      $('input[type="search"]', win).addEventListener("input", (e) => {
+        query = e.target.value;
+        render();
+      });
+      render();
     }
-    const blockKeys = [
-      "ArrowDown",
-      "ArrowUp",
-      "PageDown",
-      "PageUp",
-      "Home",
-      "End",
-      " ",
-    ]; // block while visible
-    if (blockKeys.includes(e.key)) {
+    if (id === "terminal") this.setupTerminal(win);
+    if (id === "notes") {
+      const textarea = $("textarea", win);
+      textarea.value = storage.get(
+        "note",
+        "A note to self\n\nStay curious.\nBuild useful things.\nHave a little fun.\n\n— Eddie\n\n____________________________\n\nYour turn. What would you build?",
+      );
+      textarea.addEventListener("input", () => {
+        const ok = storage.set("note", textarea.value);
+        $(".save-status", win).textContent = ok
+          ? "Saved locally"
+          : "Changes last until this tab closes";
+      });
+    }
+    if (id === "settings")
+      $$("[data-wallpaper]", win).forEach((button) =>
+        button.addEventListener("click", () =>
+          this.setWallpaper(button.dataset.wallpaper),
+        ),
+      );
+    if (id === "game") {
+      this.startGame(win);
+      $(".game-restart", win).addEventListener("click", () =>
+        this.startGame(win),
+      );
+    }
+  }
+
+  renderProjects(win, filter, query) {
+    $(".project-detail", win)?.remove();
+    [".finder-toolbar", ".project-grid", ".finder-status"].forEach(
+      (selector) => ($(selector, win).hidden = false),
+    );
+    const filtered = projects.filter(
+      (p) =>
+        (filter === "all" || p.category === filter) &&
+        `${p.name} ${p.kind} ${p.stack.join(" ")}`
+          .toLowerCase()
+          .includes(query.toLowerCase()),
+    );
+    $(".project-grid", win).innerHTML = filtered.length
+      ? filtered
+          .map(
+            (p) =>
+              `<button class="project-tile" data-project="${p.id}"><span class="project-preview" style="--project-color:${p.color}">${p.image ? `<img src="${p.image}" alt="${p.name} preview" loading="lazy"/>` : `<b class="project-glyph">${p.glyph}</b>`}${p.badge ? `<span class="project-badge">${p.badge}</span>` : ""}</span><strong>${p.name} <span>↗</span></strong><span class="project-kind">${p.kind}</span><span class="project-caption">${p.description}</span></button>`,
+          )
+          .join("")
+      : `<div class="project-empty">${symbol("search")}<h2>No projects found</h2><p>Try a name or technology, like “Python”.</p></div>`;
+    $(".finder-status", win).textContent =
+      `${filtered.length} ${filtered.length === 1 ? "item" : "items"}`;
+    $$("[data-project]", win).forEach((button) => {
+      button.addEventListener("click", (e) => {
+        if (
+          (innerWidth > 760 || matchMedia("(pointer: fine)").matches) &&
+          e.detail === 1
+        ) {
+          $$("[data-project]", win).forEach((el) => {
+            el.classList.toggle("selected", el === button);
+            el.setAttribute("aria-pressed", el === button);
+          });
+          return;
+        }
+        this.projectDetail(win, button.dataset.project);
+      });
+      button.addEventListener("keydown", (e) => {
+        if (e.key === " ") {
+          e.preventDefault();
+          this.projectDetail(win, button.dataset.project);
+        }
+      });
+    });
+  }
+
+  projectDetail(win, id) {
+    const p = projects.find((project) => project.id === id);
+    if (!p) return;
+    $(".project-detail", win)?.remove();
+    const detail = document.createElement("article");
+    detail.className = "project-detail";
+    detail.dataset.project = id;
+    detail.innerHTML = `<button class="text-button project-back">${symbol("back")} Back to projects</button><div class="detail-art" style="--project-color:${p.color}">${p.image ? `<img src="${p.image}" alt="${p.name} project preview"/>` : `<b>${p.glyph}</b>`}</div><p class="eyebrow">${p.badge || p.kind}</p><h1>${p.name}</h1><p>${p.detail}</p><div class="tech-tags">${p.stack.map((t) => `<span>${t}</span>`).join("")}</div>${p.url ? `<a class="primary-button" href="${p.url}" target="_blank" rel="noopener">${p.url.includes("github") ? "View source" : "Visit project"} ${symbol("external")}</a>` : '<p class="detail-note">Built at a hackathon. Ask me about it sometime.</p>'}${p.source ? `<a class="text-button project-source" href="${p.source}" target="_blank" rel="noopener">View source ${symbol("code")}</a>` : ""}`;
+    [".finder-toolbar", ".project-grid", ".finder-status"].forEach(
+      (selector) => ($(selector, win).hidden = true),
+    );
+    $(".finder-main", win).append(detail);
+    $(".project-back", detail).addEventListener("click", () => {
+      detail.remove();
+      [".finder-toolbar", ".project-grid", ".finder-status"].forEach(
+        (selector) => ($(selector, win).hidden = false),
+      );
+      $(`[data-project="${id}"]`, win)?.focus();
+    });
+    $(".project-back", detail).focus();
+  }
+
+  setupTerminal(win) {
+    const form = $("form", win);
+    const input = $("input", form);
+    let historyIndex = this.history.length;
+    form.addEventListener("submit", (e) => {
       e.preventDefault();
+      const value = input.value.trim();
+      if (!value) return;
+      this.history.push(value);
+      historyIndex = this.history.length;
+      input.value = "";
+      this.runTerminal(win, value);
+    });
+    $$("[data-term]", win).forEach((button) =>
+      button.addEventListener("click", () => {
+        this.runTerminal(win, button.dataset.term);
+        input.focus();
+      }),
+    );
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "ArrowUp" || e.key === "ArrowDown") {
+        e.preventDefault();
+        historyIndex = Math.min(
+          this.history.length,
+          Math.max(0, historyIndex + (e.key === "ArrowUp" ? -1 : 1)),
+        );
+        input.value = this.history[historyIndex] || "";
+      }
+      if (e.key === "Tab") {
+        e.preventDefault();
+        input.value =
+          [
+            "help",
+            "skills",
+            "whoami",
+            "projects",
+            "contact",
+            "experience",
+            "neofetch",
+            "clear",
+            "ls",
+            "snow",
+          ].find((command) => command.startsWith(input.value)) || input.value;
+      }
+    });
+  }
+
+  runTerminal(win, value) {
+    const output = $(".terminal-output", win);
+    const command = value.toLowerCase();
+    if (command === "clear") {
+      output.replaceChildren();
+      return;
+    }
+    const line = document.createElement("p");
+    line.className = "terminal-command-line";
+    line.textContent = `eddie ~ ❯ ${value}`;
+    output.append(line);
+    const result = document.createElement("div");
+    result.className = "terminal-response";
+    const responses = {
+      help: "Available commands\n\n  whoami       A short introduction\n  skills       The tools in my toolkit\n  experience   What I’ve been up to\n  projects     Open my project folder\n  contact      Say hello\n  neofetch     System information, sort of\n  ls           Look around\n  snow         A little mountain weather\n  clear        Start fresh\n\nTip: ↑ ↓ for history. Tab to autocomplete.",
+      whoami:
+        "Eddie Bian\nCompetitive programmer & full-stack developer.\nIB student. Hackathon builder. Snowboard volunteer.\nBased in Toronto, Canada.",
+      skills:
+        "Languages    Python · JavaScript · TypeScript · Java · C++\nWeb          React · Next.js · FastAPI\nDesktop      Tauri · Rust\nMobile       Expo · React Native\nData         Supabase · PostgreSQL\nTools        Git · Figma · Three.js · GSAP",
+      experience:
+        "A few highlights from the original résumé:\n\nDECA / Computer Science — Training Executive\nRobotics — Logistics Executive\nGlen Eden — Snowboard Volunteer\n\nWinner — Hack the North, Swarm\n1st — FBLC National, Coding & Programming\nTop 9 / 126 — DECA Provincials, Finance Operations Research\nTop 25 / 1460 — DECA National, Stock Market Game",
+      neofetch:
+        "eddie@internet\n────────────────────────────\nOS       eddieOS (browser edition)\nShell    curiosity.sh\nTheme    " +
+        this.wallpaper +
+        `\nProjects ${projects.length} selected\nLocation Toronto, Canada\nFuel     One more idea\nUptime   Long enough for a tiny break`,
+      ls: "about.md     projects/     résumé.pdf\nnotes.txt    tiny-break/   a-little-curiosity/",
+      pwd: "/Users/eddie/a-little-corner-of-the-internet",
+      sudo: "Nice try. You already have permission to be curious.",
+    };
+    if (responses[command]) result.textContent = responses[command];
+    else if (command === "projects" || command === "contact") {
+      this.open(command);
+      result.textContent = `Opening ${command}…`;
+    } else if (command === "snow") {
+      this.snow();
+      result.textContent =
+        "Forecast: a brief flurry. A good day to think about snowboarding.";
+    } else if (command.startsWith("echo ")) result.textContent = value.slice(5);
+    else if (command.startsWith("sudo ")) result.textContent = responses.sudo;
+    else
+      result.textContent = `Command not found: ${value}\nTry “help” to see what this little shell can do.`;
+    output.append(result);
+    $(".terminal-app", win).scrollTop = $(".terminal-app", win).scrollHeight;
+  }
+
+  startGame(win) {
+    clearTimeout(win.gameTimer);
+    const glyphs = ["🪿", "🏂", "💻", "🌲", "🍵", "🛠️", "⛰️", "🌻"];
+    const deck = [...glyphs, ...glyphs];
+    for (let i = deck.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [deck[i], deck[j]] = [deck[j], deck[i]];
+    }
+    let flipped = [];
+    let moves = 0;
+    let pairs = 0;
+    let locked = false;
+    $(".game-moves", win).textContent = "0";
+    $(".game-pairs", win).textContent = "0 / 8";
+    $(".game-message", win).textContent = "Pick any two cards to get started.";
+    const grid = $(".memory-grid", win);
+    grid.innerHTML = deck
+      .map(
+        (glyph, i) =>
+          `<button class="memory-card" aria-label="Reveal card ${i + 1}" data-index="${i}"><span class="card-back">✳</span><span class="card-front" aria-hidden="true">${glyph}</span></button>`,
+      )
+      .join("");
+    $$(".memory-card", grid).forEach((button) =>
+      button.addEventListener("click", () => {
+        if (
+          locked ||
+          button.classList.contains("flipped") ||
+          button.classList.contains("matched")
+        )
+          return;
+        button.classList.add("flipped");
+        button.setAttribute(
+          "aria-label",
+          `Card ${Number(button.dataset.index) + 1}: ${deck[button.dataset.index]}`,
+        );
+        flipped.push(button);
+        if (flipped.length !== 2) return;
+        moves++;
+        $(".game-moves", win).textContent = moves;
+        if (deck[flipped[0].dataset.index] === deck[flipped[1].dataset.index]) {
+          flipped.forEach((card) => {
+            card.classList.add("matched");
+            card.setAttribute("aria-disabled", "true");
+          });
+          pairs++;
+          $(".game-pairs", win).textContent = `${pairs} / 8`;
+          flipped = [];
+          $(".game-message", win).textContent =
+            pairs === 8
+              ? `All paired up in ${moves} moves. Nicely done. Take a breath.`
+              : "A little match. Keep going.";
+        } else {
+          locked = true;
+          win.gameTimer = setTimeout(() => {
+            flipped.forEach((card) => {
+              card.classList.remove("flipped");
+              card.setAttribute(
+                "aria-label",
+                `Reveal card ${Number(card.dataset.index) + 1}`,
+              );
+            });
+            flipped = [];
+            locked = false;
+          }, 850);
+        }
+      }),
+    );
+  }
+
+  focus(id, moveFocus = true) {
+    const data = this.windows.get(id);
+    if (!data || data.el.hidden) return;
+    if (this.active === id) {
+      if (moveFocus) (id === "terminal" ? $("#terminal-command", data.el) : data.el).focus({ preventScroll: true });
+      return;
+    }
+    this.active = id;
+    this.windows.forEach((w) => w.el.classList.remove("is-active"));
+    data.el.classList.add("is-active");
+    data.el.style.zIndex = ++this.z;
+    $(".active-app").textContent =
+      id === "about"
+        ? "Arc"
+        : id === "projects"
+          ? "Finder"
+          : id === "contact"
+            ? "Contacts"
+            : id === "resume"
+              ? "Preview"
+              : apps.find((app) => app.id === id).name;
+    this.updateDock();
+    if (moveFocus) {
+      const target =
+        id === "terminal" ? $("#terminal-command", data.el) : data.el;
+      target.focus({ preventScroll: true });
     }
   }
 
-  _tickClock() {
+  frontWindow() {
+    return [...this.windows.entries()]
+      .filter(([, data]) => !data.el.hidden && !data.minimizing)
+      .sort((a, b) => Number(b[1].el.style.zIndex) - Number(a[1].el.style.zIndex))[0]?.[0];
+  }
+
+  close(id) {
+    const data = this.windows.get(id);
+    if (!data) return;
+    if (this.gesture?.data === data) this.endGesture();
+    data.minimizeAnimation?.cancel();
+    clearTimeout(data.el.gameTimer);
+    data.el.remove();
+    this.windows.delete(id);
+    const remaining = this.frontWindow();
+    if (remaining) this.focus(remaining, this.active === id);
+    else {
+      this.active = null;
+      $(".active-app").textContent = "Finder";
+      $(`.dock-app[data-open="${id}"]`)?.focus();
+    }
+    this.updateDock();
+  }
+
+  minimize(id) {
+    const data = this.windows.get(id);
+    if (!data || data.minimizing) return;
+    if (this.gesture?.data === data) this.endGesture();
+    if (innerWidth <= 760 && !matchMedia("(pointer: fine)").matches) {
+      this.close(id);
+      return;
+    }
+    data.minimizing = true;
+    this.revealDock(1200);
+    const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const animation = data.el.animate(
+      [
+        {
+          transform: "translateY(0) scale(1)",
+          opacity: 1,
+          borderRadius: "16px",
+        },
+        {
+          transform: "translateY(60px) scale(.65,.9)",
+          opacity: 1,
+          borderRadius: "16px",
+          offset: 0.35,
+        },
+        {
+          transform: `translateY(${innerHeight - data.y - data.height / 2 - 95}px) scale(.08,.06)`,
+          opacity: 0.1,
+          borderRadius: "4px",
+        },
+      ],
+      { duration: reduced ? 0 : 350, easing: "cubic-bezier(.4,0,.8,.5)" },
+    );
+    data.minimizeAnimation = animation;
+    animation.onfinish = () => {
+      if (!this.windows.has(id)) return;
+      data.el.hidden = true;
+      data.minimized = true;
+      data.minimizing = false;
+      if (this.active === id) {
+        this.active = null;
+        const remaining = this.frontWindow();
+        if (remaining) this.focus(remaining, false);
+        else $(".active-app").textContent = "Finder";
+      }
+      this.updateDock();
+    };
+  }
+
+  revealDock(duration = 2200) {
+    this.root.classList.add("dock-visible");
+    clearTimeout(this.dockTimer);
+    this.dockTimer = setTimeout(() => {
+      if (!$(".os-dock").matches(":hover"))
+        this.root.classList.remove("dock-visible");
+    }, duration);
+  }
+
+  toggleDesktop() {
+    if (innerWidth <= 760) return;
+    this.desktopRevealed = !this.desktopRevealed;
+    if (this.desktopRevealed) {
+      this.previousActive = this.active;
+      this.windows.forEach((data) => {
+        data.revealHidden = !data.el.hidden;
+        if (data.revealHidden) data.el.hidden = true;
+      });
+      this.active = null;
+      $(".active-app").textContent = "Finder";
+    } else {
+      this.windows.forEach((data) => {
+        if (data.revealHidden) {
+          data.el.hidden = false;
+          data.revealHidden = false;
+        }
+      });
+      if (this.previousActive && this.windows.has(this.previousActive))
+        this.focus(this.previousActive, false);
+    }
+    this.updateDock();
+  }
+
+  maximize(id) {
+    const data = this.windows.get(id);
+    if (!data) return;
+    if (this.gesture?.data === data) this.endGesture();
+    if (innerWidth <= 760) {
+      const filled = data.el.classList.toggle("compact-zoomed");
+      $(".maximize", data.el).setAttribute(
+        "aria-label",
+        `${filled ? "Restore" : "Maximize"} ${apps.find((app) => app.id === id).name}`,
+      );
+      return;
+    }
+    if (!data.maximized) {
+      data.previous = {
+        x: data.x,
+        y: data.y,
+        width: data.width,
+        height: data.height,
+      };
+      Object.assign(data, {
+        x: 12,
+        y: 12,
+        width: innerWidth - 24,
+        height: innerHeight - (this.autoHideDock ? 53 : 124),
+      });
+    } else Object.assign(data, data.previous);
+    data.maximized = !data.maximized;
+    this.position(data);
+    $(".maximize", data.el).setAttribute(
+      "aria-label",
+      `${data.maximized ? "Restore" : "Maximize"} ${apps.find((app) => app.id === id).name}`,
+    );
+  }
+
+  position(data) {
+    Object.assign(data.el.style, {
+      left: `${data.x}px`,
+      top: `${data.y}px`,
+      width: `${data.width}px`,
+      height: `${data.height}px`,
+    });
+  }
+
+  startGesture(e, win, id, direction = null) {
+    const data = this.windows.get(id);
+    if (this.gesture || e.button !== 0 || !e.isPrimary || innerWidth <= 760 || data.maximized || data.minimizing) return;
+    e.preventDefault();
+    e.stopPropagation();
+    this.focus(id, false);
+    // The window owns capture for both titlebar and edge gestures. There is
+    // no transform offset to reconcile when capture ends or is interrupted.
+    win.setPointerCapture(e.pointerId);
+    this.gesture = {
+      data, win, direction, pointerId: e.pointerId,
+      clientX: e.clientX, clientY: e.clientY,
+      start: { x: data.x, y: data.y, width: data.width, height: data.height },
+      bounds: { width: this.area.clientWidth, height: this.area.clientHeight },
+      moved: false,
+    };
+    win.classList.add("dragging");
+    this.root.classList.add("window-gesture");
+  }
+
+  endGesture(e) {
+    const gesture = this.gesture;
+    if (!gesture || (e && e.pointerId !== gesture.pointerId)) return;
+    this.gesture = null;
+    if (gesture.moved) this.suppressClickUntil = performance.now() + 250;
+    gesture.win.classList.remove("dragging");
+    this.root.classList.remove("window-gesture");
+    if (gesture.win.hasPointerCapture(gesture.pointerId)) gesture.win.releasePointerCapture(gesture.pointerId);
+  }
+
+  drag(win, id) {
+    const start = (e) => {
+      if (!e.target.closest("button, input, a, textarea")) this.startGesture(e, win, id);
+    };
+    $(".window-titlebar", win).addEventListener("pointerdown", start);
+    if (id === "about") $(".arc-sidebar", win).addEventListener("pointerdown", start);
+    if (id === "projects") {
+      $(".finder-toolbar", win).addEventListener("pointerdown", start);
+      $(".finder-toolbar", win).addEventListener("dblclick", (e) => {
+        if (!e.target.closest("button, input, a")) this.maximize(id);
+      });
+    }
+    win.addEventListener("pointermove", (e) => {
+      const gesture = this.gesture;
+      if (!gesture || gesture.win !== win || e.pointerId !== gesture.pointerId) return;
+      const dx = e.clientX - gesture.clientX;
+      const dy = e.clientY - gesture.clientY;
+      if (Math.hypot(dx, dy) < 3 && !gesture.moved) return;
+      gesture.moved = true;
+      const next = gesture.direction
+        ? resizeWindow(gesture.start, dx, dy, gesture.direction, gesture.bounds)
+        : moveWindow(gesture.start, dx, dy, gesture.bounds);
+      Object.assign(gesture.data, next);
+      this.position(gesture.data);
+    });
+    ["pointerup", "pointercancel", "lostpointercapture"].forEach((event) =>
+      win.addEventListener(event, (e) => this.endGesture(e)));
+  }
+
+  resize(win, id) {
+    for (const direction of ["n", "s", "e", "w", "ne", "nw", "se", "sw"]) {
+      const handle = document.createElement("div");
+      handle.className = `window-edge edge-${direction}`;
+      handle.setAttribute("aria-hidden", "true");
+      win.append(handle);
+      handle.addEventListener("pointerdown", (e) => this.startGesture(e, win, id, direction));
+    }
+    $(".window-resize", win).remove();
+  }
+
+  constrainWindows() {
+    if (innerWidth <= 760) return;
+    this.windows.forEach((data, id) => {
+      if (data.createdCompact) {
+        const sizes = {
+          about: [900, 660],
+          projects: [900, 610],
+          contact: [720, 560],
+          game: [480, 610],
+        };
+        const [preferredWidth, preferredHeight] = sizes[id] || [650, 530];
+        data.width = Math.min(preferredWidth, innerWidth - 48);
+        data.height = Math.min(preferredHeight, innerHeight - 100);
+        data.x = (innerWidth - data.width) / 2;
+        data.y = Math.max(12, (innerHeight - data.height - 80) / 2);
+        data.createdCompact = false;
+      }
+      if (data.maximized) {
+        Object.assign(data, {
+          x: 12,
+          y: 12,
+          width: innerWidth - 24,
+          height: innerHeight - (this.autoHideDock ? 53 : 124),
+        });
+        this.position(data);
+        return;
+      }
+      data.width = Math.min(data.width, innerWidth - 24);
+      data.height = Math.min(
+        data.height,
+        innerHeight - (this.autoHideDock ? 65 : 138),
+      );
+      data.x = Math.max(0, Math.min(data.x, innerWidth - data.width));
+      data.y = Math.max(
+        0,
+        Math.min(
+          data.y,
+          innerHeight - data.height - (this.autoHideDock ? 40 : 130),
+        ),
+      );
+      this.position(data);
+    });
+  }
+
+  updateDock() {
+    const minimizedMarkup = [...this.windows.entries()]
+      .filter(([, data]) => data.minimized)
+      .map(([id]) => {
+        const app = apps.find((app) => app.id === id);
+        return `<button class="dock-app dock-window" data-open="${id}" aria-label="Restore ${app.name}"><span class="minimized-thumbnail">${app.name}${appIcon(app.icon)}</span><span class="dock-tooltip">${app.name}</span></button>`;
+      })
+      .join("");
+    if ($(".dock-minimized").innerHTML !== minimizedMarkup) $(".dock-minimized").innerHTML = minimizedMarkup;
+    const compact = innerWidth <= 760;
+    const hasVisibleWindow = [...this.windows.values()].some(
+      (win) => !win.el.hidden,
+    );
+    this.windows.forEach((win, id) => {
+      win.el.inert = compact && id !== this.active;
+    });
+    $(".desktop-widgets").inert = compact && hasVisibleWindow;
+    $(".desktop-files").inert = compact && hasVisibleWindow;
+    $$(".dock-app").forEach((button) => {
+      const win = this.windows.get(button.dataset.open);
+      button.classList.toggle("running", Boolean(win));
+      button.classList.toggle(
+        "frontmost",
+        Boolean(win && !win.el.hidden && button.dataset.open === this.active),
+      );
+    });
+  }
+
+  spotlight() {
+    this.closePopover();
+    this.previousFocus = document.activeElement;
+    $(".spotlight-backdrop").hidden = false;
+    this.search("");
+    $(".spotlight input").value = "";
+    $(".spotlight input").focus();
+  }
+  search(query) {
+    const results = apps.filter((app) =>
+      `${app.name} ${app.subtitle}`.toLowerCase().includes(query.toLowerCase()),
+    );
+    $(".spotlight-results").innerHTML = results.length
+      ? results
+          .map(
+            (app, i) =>
+              `<button class="spotlight-result ${i === 0 ? "highlighted" : ""}" data-open="${app.id}">${appIcon(app.icon)}<span><strong>${app.name}</strong><small>${app.subtitle}</small></span><span class="search-return">↵</span></button>`,
+          )
+          .join("")
+      : '<p class="search-empty">No apps found. Try “Projects” or “Terminal”.</p>';
+  }
+  dismiss() {
+    const wasOpen = !$(".spotlight-backdrop").hidden;
+    $(".spotlight-backdrop").hidden = true;
+    if (wasOpen && this.previousFocus?.isConnected)
+      this.previousFocus.focus({ preventScroll: true });
+  }
+
+  menu(name, anchor, point) {
+    const popover = $(".os-popover");
+    if (!popover.hidden && popover.dataset.menu === name) {
+      this.closePopover();
+      return;
+    }
+    const item = (label, cmd, shortcut = "") =>
+      `<button data-command="${cmd}">${label}<kbd>${shortcut}</kbd></button>`;
+    const menus = {
+      home: `<strong>Eddie’s Mac</strong>${item("About Eddie", "about")}<hr>${item("Appearance…", "settings")}${item("Text version", "text")}<hr>${item("Visit the 3D desk ↗", "intro")}`,
+      edit: `${item("Copy Email Address", "copy-email")}${item("Copy Website Address", "copy-url")}<hr>${item("Open Notes", "notes")}`,
+      go: `${item("About Eddie", "about")}${item("Projects", "projects")}${item("Contact", "contact")}${item("Résumé", "resume")}`,
+      file: `${item("Open Projects", "projects")}${item("New note", "notes")}${item("Open Résumé", "resume")}<hr>${item("Close Window", "close", "⌘ W")}`,
+      view: `${item("Search apps…", "spotlight", "⌘ K")}${item("Show Desktop", "desktop")}<hr>${item(this.widgets ? "Hide Widgets" : "Show Widgets", "widgets")}${item("Change Wallpaper…", "settings")}`,
+      window: `${item("Minimize", "minimize")}${item("Zoom", "maximize")}<hr>${[...this.windows.keys()].map((id) => `<button data-open="${id}">${id === this.active ? "✓ " : ""}${apps.find((a) => a.id === id).name}</button>`).join("") || "<span>No windows open</span>"}`,
+      help: `<strong>Make yourself at home.</strong><p>Click an app to open it. Double-click desktop files to open them. Drag a title bar to move a window. Double-click it to zoom. Click the wallpaper to reveal the desktop.</p>${item("Search apps", "spotlight", "⌘ K")}${item("Take a tiny break", "game")}`,
+      controls: `<strong>Control Center</strong><p>A little room to make your own.</p>${item(this.widgets ? "✓ Desktop widgets" : "Desktop widgets", "widgets")}${item("Show Desktop", "desktop")}${item(this.autoHideDock ? "✓ Automatically Hide Dock" : "Automatically Hide Dock", "autohide")}${item("Appearance…", "settings")}`,
+    };
+    popover.innerHTML = menus[name];
+    popover.hidden = false;
+    popover.dataset.menu = name;
+    const rect = anchor?.getBoundingClientRect();
+    const left = point?.x ?? rect?.left ?? innerWidth - 290;
+    popover.style.left = `${Math.max(8, Math.min(left, innerWidth - 290))}px`;
+    popover.style.top = `${Math.min(point?.y ?? 37, innerHeight - popover.offsetHeight - 10)}px`;
+    $("button", popover)?.focus();
+  }
+  closePopover() {
+    $(".os-popover").hidden = true;
+  }
+
+  command(cmd) {
+    this.closePopover();
+    if (apps.some((app) => app.id === cmd)) this.open(cmd);
+    else if (cmd === "spotlight") this.spotlight();
+    else if (cmd === "controls") this.menu("controls");
+    else if (cmd === "dismiss") this.dismiss();
+    else if (cmd === "close" && this.active) this.close(this.active);
+    else if (cmd === "minimize" && this.active) this.minimize(this.active);
+    else if (cmd === "maximize" && this.active) this.maximize(this.active);
+    else if (cmd === "desktop") this.toggleDesktop();
+    else if (cmd === "autohide") {
+      this.autoHideDock = !this.autoHideDock;
+      storage.set("autohide", this.autoHideDock ? "on" : "off");
+      this.applyAppearance();
+      this.revealDock();
+    } else if (cmd === "widgets") {
+      this.widgets = !this.widgets;
+      storage.set("widgets", this.widgets ? "on" : "off");
+      this.applyAppearance();
+    } else if (cmd === "text") this.textVersion();
+    else if (cmd === "intro") location.href = "./";
+    else if (cmd === "trash")
+      this.toast("Nothing here. Even my bad ideas get a second chance.");
+    else if (cmd === "copy-email") this.copyEmail();
+    else if (cmd === "copy-url") {
+      navigator.clipboard
+        .writeText("https://eddiebian.me")
+        .then(() => this.toast("Website address copied."))
+        .catch(() => this.toast("eddiebian.me"));
+    } else if (cmd === "reset-note") {
+      storage.set("note", "");
+      const win = this.windows.get("notes");
+      if (win) {
+        $("textarea", win.el).value = "";
+        $("textarea", win.el).focus();
+      }
+    }
+  }
+  async copyEmail() {
+    try {
+      await navigator.clipboard.writeText("eddie.bian@yahoo.com");
+      this.toast("Email address copied. Say hello sometime.");
+    } catch {
+      this.toast("Email: eddie.bian@yahoo.com");
+    }
+  }
+  textVersion() {
+    document.body.classList.add("text-open");
+    window.app?.pause();
+    this.previousTextFocus = document.activeElement;
+    $("#fast-mode").style.display = "block";
+    $("#fast-mode").scrollTop = 0;
+    this.root.inert = true;
+    $("#exit-fast-mode").textContent = this.visible ? "Back to desktop" : "Back to 3D";
+    $("#intro-hud").inert = true;
+    $("#exit-fast-mode").focus();
+  }
+  closeTextVersion() {
+    document.body.classList.remove("text-open");
+    if (!this.visible) window.app?.resume();
+    $("#fast-mode").style.display = "none";
+    this.root.inert = !this.visible;
+    $("#intro-hud").inert = this.visible;
+    if (this.previousTextFocus?.isConnected && !this.previousTextFocus.closest("[inert]")) this.previousTextFocus.focus();
+  }
+  setWallpaper(name) {
+    this.wallpaper = name;
+    storage.set("wallpaper", name);
+    this.applyAppearance();
+  }
+  applyAppearance() {
+    this.root.dataset.wallpaper = this.wallpaper;
+    $$('.toggle[data-command="autohide"]').forEach((button) =>
+      button.setAttribute("aria-checked", this.autoHideDock),
+    );
+    this.root.classList.toggle("dock-autohide", this.autoHideDock);
+    this.root.classList.toggle("widgets-hidden", !this.widgets);
+    $$("[data-wallpaper]").forEach((button) =>
+      button.setAttribute(
+        "aria-pressed",
+        button.dataset.wallpaper === this.wallpaper,
+      ),
+    );
+    $$('.toggle[data-command="widgets"]').forEach((button) =>
+      button.setAttribute("aria-checked", this.widgets),
+    );
+  }
+  toast(message) {
+    $(".os-toast").textContent = message;
+    $(".os-toast").classList.add("show");
+    clearTimeout(this.toastTimer);
+    this.toastTimer = setTimeout(
+      () => $(".os-toast").classList.remove("show"),
+      3800,
+    );
+  }
+  snow() {
+    $(".snowfall")?.remove();
+    const snow = document.createElement("div");
+    snow.className = "snowfall";
+    snow.setAttribute("aria-hidden", "true");
+    snow.innerHTML = Array.from(
+      { length: 36 },
+      (_, i) =>
+        `<i style="--x:${(i * 47) % 100}%;--delay:${(i % 8) * -0.6}s;--duration:${5 + (i % 4)}s">✳</i>`,
+    ).join("");
+    this.root.append(snow);
+    setTimeout(() => snow.remove(), 8000);
+  }
+  tick() {
     const now = new Date();
-    const time = now.toLocaleTimeString(undefined, {
+    const opts = { timeZone: "America/Toronto" };
+    const date = now.toLocaleDateString("en-CA", {
+      ...opts,
+      weekday: "short",
+      month: "short",
+      day: "numeric",
+    });
+    const time = now.toLocaleTimeString("en-CA", {
+      ...opts,
       hour: "numeric",
       minute: "2-digit",
     });
-    if (this._clockEl) {
-      const weekday = now.toLocaleDateString(undefined, { weekday: "short" });
-      const month = now.toLocaleDateString(undefined, { month: "short" });
-      const day = now.getDate();
-      const dateStr = `${weekday} ${month} ${day}`;
-      this._clockEl.textContent = `${dateStr}\u2003${time}`;
-    }
-    if (this._iosClockEl) {
-      this._iosClockEl.textContent = time;
-    }
-    setTimeout(() => this._tickClock(), 15000);
+    $(".menu-clock").innerHTML =
+      `<span class="clock-date">${date}</span><span>${time}</span>`;
+    $(".widget-weekday").textContent = now.toLocaleDateString("en-CA", {
+      ...opts,
+      weekday: "long",
+    });
+    $(".widget-day").textContent = now.toLocaleDateString("en-CA", {
+      ...opts,
+      day: "numeric",
+    });
+    $(".widget-month").textContent = now.toLocaleDateString("en-CA", {
+      ...opts,
+      month: "long",
+    });
+    const parts = new Intl.DateTimeFormat("en-US", {
+      ...opts,
+      hour: "numeric",
+      minute: "numeric",
+      hour12: false,
+    }).formatToParts(now);
+    const hour = Number(parts.find((p) => p.type === "hour").value);
+    const minute = Number(parts.find((p) => p.type === "minute").value);
+    $(".clock-hour").style.transform = `rotate(${hour * 30 + minute / 2}deg)`;
+    $(".clock-minute").style.transform = `rotate(${minute * 6}deg)`;
+    setTimeout(() => this.tick(), 15000);
   }
 }
 
-// Lazy init after DOM ready & allow other scripts to load first
-document.addEventListener("DOMContentLoaded", () => {
-  // Delay creation; ensures initial page unaffected
-  setTimeout(() => {
-    window.macDesktop = new MacDesktop();
-  }, 1200);
-
-  // Fast Mode Toggle
-  const fastBtn = document.getElementById("fast-mode-btn");
-  const fastMode = document.getElementById("fast-mode");
-  const exitBtn = document.getElementById("exit-fast-mode");
-  const scrollIndicator = document.getElementById("fast-mode-scroll-indicator");
-  const readyNotice = document.getElementById("fast-mode-ready-notice");
-  const backTo3DBtn = document.getElementById("fast-mode-back-to-3d");
-
-  const showIndicator = () => {
-    if (!scrollIndicator) return;
-    scrollIndicator.style.display = "flex";
-    requestAnimationFrame(() => {
-      scrollIndicator.style.opacity = "1";
-      scrollIndicator.style.transform = "translateX(-50%) translateY(0px)";
+$("#text-projects").innerHTML = projects.map((p) => `<li><h3>${p.url ? `<a href="${p.url}" target="_blank" rel="noopener">${p.name}</a>` : p.name}</h3><p class="fm-meta-line">${p.badge || p.kind}</p><p>${p.detail}</p><p class="fm-meta-line">${p.stack.join(" · ")}</p></li>`).join("");
+window.macDesktop = new EddieDesktop();
+window.macDesktop.root.inert = intro;
+if (intro) {
+  document.body.classList.add("intro-mode", "is-loading");
+  history.scrollRestoration = "manual";
+  window.scrollTo(0, 0);
+  const script = (src) =>
+    new Promise((resolve, reject) => {
+      const el = document.createElement("script");
+      el.src = src;
+      el.onload = resolve;
+      el.onerror = reject;
+      document.head.append(el);
     });
-  };
-
-  const hideIndicator = () => {
-    if (!scrollIndicator) return;
-    scrollIndicator.style.opacity = "0";
-    scrollIndicator.style.transform = "translateX(-50%) translateY(20px)";
-    // Keep display none after transition
-    setTimeout(() => {
-      if (scrollIndicator.style.opacity === "0") {
-        scrollIndicator.style.display = "none";
-      }
-    }, 260);
-  };
-
-  if (fastBtn && fastMode && exitBtn) {
-    let modelsLoaded = !document.body.classList.contains("is-loading");
-
-    const showReadyNotice = () => {
-      if (!readyNotice) return;
-      readyNotice.style.display = "inline-flex";
-      requestAnimationFrame(() => {
-        readyNotice.style.opacity = "1";
-        readyNotice.style.transform = "translateX(-50%) translateY(0px)";
-      });
-    };
-
-    const hideReadyNotice = () => {
-      if (!readyNotice) return;
-      readyNotice.style.opacity = "0";
-      readyNotice.style.transform = "translateX(-50%) translateY(16px)";
-      setTimeout(() => {
-        if (readyNotice.style.opacity === "0") {
-          readyNotice.style.display = "none";
-        }
-      }, 260);
-    };
-
-    const closeFastMode = () => {
-      fastMode.style.display = "none";
-      document.body.style.overflow = "auto";
-      document.body.classList.remove("fast-mode-open");
-      hideReadyNotice();
-
-      // Show the button again when exiting fast mode
-      const scrollProgress =
-        window.scrollY /
-        (document.documentElement.scrollHeight - window.innerHeight);
-      if (scrollProgress > 0.2 && scrollProgress < 0.9) {
-        fastBtn.style.opacity = "1";
-        fastBtn.style.transform = "translate(-50%, -50%) scale(1)";
-        showIndicator();
-      }
-    };
-
-    window.addEventListener("app-models-loaded", () => {
-      modelsLoaded = true;
-      if (fastMode.style.display === "block") {
-        showReadyNotice();
-      }
-    });
-
-    // Initially show the button
-    fastBtn.style.opacity = "1";
-    fastBtn.style.transform = "translate(-50%, -50%) scale(1)";
-    // Show scroll indicator immediately after load
-    showIndicator();
-
-    fastBtn.addEventListener("click", () => {
-      fastMode.style.display = "block";
-      document.body.style.overflow = "hidden"; // Prevent background scroll
-      document.body.classList.add("fast-mode-open");
-      // Hide the button after clicking
-      fastBtn.style.opacity = "0";
-      fastBtn.style.transform = "translate(-50%, -50%) scale(0)";
-      hideIndicator();
-
-      if (modelsLoaded) {
-        showReadyNotice();
-      } else {
-        hideReadyNotice();
-      }
-    });
-
-    exitBtn.addEventListener("click", closeFastMode);
-
-    if (backTo3DBtn) {
-      backTo3DBtn.addEventListener("click", closeFastMode);
-    }
-
-    // Show/hide button based on scroll progress
-    let buttonVisible = true; // Start as visible
-    const showButton = () => {
-      if (!buttonVisible) {
-        buttonVisible = true;
-        fastBtn.style.opacity = "1";
-        fastBtn.style.transform = "translate(-50%, -50%) scale(1)";
-      }
-    };
-
-    const hideButton = () => {
-      if (buttonVisible) {
-        buttonVisible = false;
-        fastBtn.style.opacity = "0";
-        fastBtn.style.transform = "translate(-50%, -50%) scale(0)";
-      }
-    };
-
-    // Control button visibility based on scroll progress
-    window.addEventListener("scroll", () => {
-      const scrollProgress =
-        window.scrollY /
-        (document.documentElement.scrollHeight - window.innerHeight);
-      console.log(scrollProgress);
-      if (scrollProgress >= 0 && scrollProgress < 0.3) {
-        showButton();
-        showIndicator();
-      } else {
-        hideButton();
-        hideIndicator();
-      }
-    });
+  try {
+    await script("https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js");
+    await script(
+      "https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/ScrollTrigger.min.js",
+    );
+    const { App } = await import("./main.js");
+    window.app = new App();
+  } catch (error) {
+    console.warn("The 3D intro could not load.", error);
+    window.macDesktop.show();
+    window.macDesktop.toast(
+      "The 3D desk couldn’t load. The desktop is ready to explore.",
+    );
   }
-});
-
-export { MacDesktop };
+}

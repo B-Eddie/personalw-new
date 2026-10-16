@@ -30,36 +30,48 @@ class App {
 
       // Wait for the model to finish loading before setting up animations
       if (this.laptopModel.ready) {
-        this.laptopModel.ready.then(async () => {
-          // Hide loading overlay once model is loaded
-          const loading = document.getElementById("loading");
-          if (loading) {
-            loading.style.display = "none";
-            document.body.classList.remove("is-loading");
-            window.dispatchEvent(new Event("app-models-loaded"));
-          }
+        this.laptopModel.ready
+          .then(async () => {
+            // Hide loading overlay once model is loaded
+            const loading = document.getElementById("loading");
+            if (loading) {
+              loading.style.display = "none";
+              document.body.classList.remove("is-loading");
+              window.dispatchEvent(new Event("app-models-loaded"));
+            }
 
-          try {
-            const { AnimationManager } = await import("./animations.js");
-            this.animationManager = new AnimationManager(
-              this.sceneManager,
-              this.laptopModel,
+            if (window.macDesktop?.visible) return;
+            try {
+              const { AnimationManager } = await import("./animations.js");
+              this.animationManager = new AnimationManager(
+                this.sceneManager,
+                this.laptopModel,
+              );
+            } catch (err) {
+              console.error("Failed to initialize animations:", err);
+            }
+          })
+          .catch((error) => {
+            console.warn("The laptop model could not load.", error);
+            window.macDesktop.show();
+            window.macDesktop.toast(
+              "The 3D desk couldn’t load. The desktop is ready to explore.",
             );
-          } catch (err) {
-            console.error("Failed to initialize animations:", err);
-          }
-        });
+          });
       }
 
       this.setupEventListeners();
       // Mark running BEFORE starting loop so first frame renders
-      this.isRunning = true;
+      this.isRunning = !window.macDesktop?.visible;
       this.startRenderLoop();
 
       window.app = this;
     } catch (error) {
       console.error("Failed to initialize app:", error);
-      console.error("Error stack:", error.stack);
+      window.macDesktop.show();
+      window.macDesktop.toast(
+        "The 3D desk couldn’t load. The desktop is ready to explore.",
+      );
     }
   }
 
@@ -76,7 +88,7 @@ class App {
       if (document.hidden) {
         this.pause();
       } else {
-        this.resume();
+        if (!window.macDesktop?.visible && !document.body.classList.contains("text-open")) this.resume();
       }
     });
   }
@@ -110,11 +122,4 @@ class App {
   showHelp() {}
 }
 
-// Wait for DOM to be ready and all scripts to load
-document.addEventListener("DOMContentLoaded", () => {
-  if (window.gsap && window.ScrollTrigger) {
-    window.app = new App();
-  } else {
-    console.error("Required libraries not loaded");
-  }
-});
+export { App };
