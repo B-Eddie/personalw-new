@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+import { MeshoptDecoder } from "three/addons/libs/meshopt_decoder.module.js";
 import { CONFIG } from "./config.js";
 
 // Laptop 3D model creation and management
@@ -46,6 +47,7 @@ export class LaptopModel {
   }
   loadCombinedModel() {
     const loader = new GLTFLoader();
+    loader.setMeshoptDecoder(MeshoptDecoder);
     loader.load(
       "models/laptop-web.glb",
       (gltf) => this._onModelLoaded(gltf.scene),
@@ -53,7 +55,7 @@ export class LaptopModel {
         if (!event.total) return;
         const percentage = Math.min(100, Math.round(event.loaded / event.total * 100));
         const progress = document.querySelector(".loading-progress");
-        if (progress) progress.textContent = percentage === 100 ? "Preparing the scene…" : `Loading the 3D scene · ${percentage}%`;
+        if (progress) progress.textContent = percentage === 100 ? "Setting up the desk…" : `Loading the 3D desk · ${percentage}%`;
         const track = document.querySelector(".loading-track i");
         if (track) track.style.width = `${percentage}%`;
       },

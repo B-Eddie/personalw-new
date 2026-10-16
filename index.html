@@ -2,13 +2,13 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Eddie Bian — A little desktop on the internet</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>Eddie Bian — Developer &amp; competitive programmer</title>
     <meta
       name="description"
-      content="The personal desktop of Eddie Bian. Explore projects, play with a terminal, take a tiny break, and say hello."
+      content="Eddie Bian is a full-stack developer and competitive programmer in Toronto. Explore his projects, résumé, and a tiny Mac desktop in the browser."
     />
-    <meta name="theme-color" content="#1e1e21" />
+    <meta name="theme-color" content="#1c1b19" />
     <meta property="og:title" content="Eddie Bian — Make yourself at home" />
     <meta
       property="og:description"
@@ -18,6 +18,7 @@
     <meta property="og:image" content="https://eddiebian.me/assets/image.png" />
     <link rel="stylesheet" href="styles.css" />
     <link rel="stylesheet" href="desktop.css" />
+    <link rel="stylesheet" href="refresh.css" />
     <link rel="icon" type="image/png" href="assets/image.png" />
     <link rel="apple-touch-icon" href="assets/image.png" />
   </head>
@@ -29,29 +30,30 @@
         <a href="assets/resume.pdf">Read Eddie’s résumé instead</a>.
       </div></noscript
     >
-    <div
-      id="loading"
-      class="loading-overlay"
-      aria-live="polite"
-      aria-busy="true"
-    >
-      <div class="spinner-container">
-        <div class="loading-spinner" aria-hidden="true"></div>
-        <p class="loading-monogram">eb.</p><p class="loading-text">Setting the desk.</p><div class="loading-track"><i></i></div><span class="loading-progress">Loading the 3D scene…</span>
-        <a href="?desktop=1" class="loading-escape">Skip to the desktop ↗</a>
-      </div>
-    </div>
+    <div id="loading" class="loading-overlay" aria-hidden="true"></div>
 
     <canvas id="webgl" aria-label="A 3D desk with Eddie’s sticker-covered laptop and notebook"></canvas>
-    <section id="intro-hud" aria-label="Welcome to Eddie’s desk">
-      <a class="intro-wordmark" href="./">Eddie Bian<span>A little corner of the internet</span></a>
-      <div class="intro-copy"><p class="intro-kicker">Developer. Builder. Perpetually curious.</p><h1>Make yourself<br>at home<span>.</span></h1><p>A few projects, a few experiments,<br>and a desktop that’s yours to explore.</p></div>
-      <div class="intro-bottom"><span class="intro-chapter">01 <i></i> The desk</span><span class="intro-hint">Scroll to open the laptop <span>↓</span></span><span class="intro-number">00%</span></div>
+    <section id="intro-hud" aria-labelledby="intro-title">
+      <div class="intro-scrim" aria-hidden="true"></div>
+      <header class="intro-top">
+        <a class="intro-wordmark" href="?desktop=1"><span class="intro-mark" aria-hidden="true">eb</span>Eddie Bian</a>
+        <nav class="intro-links" aria-label="Site options">
+          <button type="button" id="fast-mode-btn" class="intro-link">Text version</button>
+          <button type="button" class="intro-link intro-skip" data-intro="enter">Skip to desktop <span aria-hidden="true">→</span></button>
+        </nav>
+      </header>
+      <div class="intro-copy">
+        <p class="intro-kicker">Full-stack developer · Competitive programmer · Toronto</p>
+        <h1 id="intro-title">Hi, I’m Eddie<span>.</span></h1>
+        <p class="intro-lede">I build useful tools, apps, and award-winning hackathon projects. This site is a tiny Mac on my desk. Come on in and look around.</p>
+        <div class="intro-actions">
+          <button type="button" class="intro-enter" data-intro="enter">Enter the desktop <span aria-hidden="true">→</span></button>
+          <button type="button" class="intro-scroll" data-intro="scroll">Open the laptop <span aria-hidden="true">↓</span></button>
+        </div>
+        <p class="intro-status" role="status"><span class="loading-track" aria-hidden="true"><i></i></span><span class="loading-progress">Loading the 3D desk…</span></p>
+      </div>
+      <div class="intro-bottom" aria-hidden="true"><span class="intro-chapter">01 <i></i> The desk</span><span class="intro-progress"><i></i></span><span class="intro-hint">Scroll to open the laptop <span>↓</span></span><span class="intro-number">00%</span></div>
     </section>
-
-    <button type="button" id="fast-mode-btn" class="fast-mode-btn">
-      Text version
-    </button>
 
     <div id="fast-mode-scroll-indicator" class="fast-mode-scroll-indicator">
       <span>Scroll to explore</span>
@@ -233,7 +235,7 @@
     <script type="importmap">
       {
         "imports": {
-          "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+          "three": "https://unpkg.com/three@0.160.0/build/three.module.min.js",
           "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
         }
       }

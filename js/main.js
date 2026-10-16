@@ -40,8 +40,13 @@ class App {
               window.dispatchEvent(new Event("app-models-loaded"));
             }
 
+            document.body.classList.add("scene-ready");
+            const status = document.querySelector(".loading-progress");
+            if (status) status.textContent = "3D desk ready. Scroll to open the laptop.";
             if (window.macDesktop?.visible) return;
             try {
+              await window.gsapReady;
+              if (window.macDesktop?.visible) return;
               const { AnimationManager } = await import("./animations.js");
               this.animationManager = new AnimationManager(
                 this.sceneManager,

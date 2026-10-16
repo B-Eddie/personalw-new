@@ -13,13 +13,19 @@ export class AnimationManager {
     const chapter = document.querySelector('.intro-chapter');
     const hint = document.querySelector('.intro-hint');
     const number = document.querySelector('.intro-number');
+    const scrim = document.querySelector('.intro-scrim');
+    const bar = document.querySelector('.intro-progress i');
     this.timeline = gsap.timeline({
       scrollTrigger: {
         trigger: 'body', start: 'top top', end: 'bottom bottom', scrub: true,
         onUpdate: ({ progress }) => {
           laptopModel.updateBootScreenProgress(Math.max(0, (progress - .45) / .55));
-          copy.style.opacity = Math.max(0, 1 - progress * 4);
+          const fade = Math.max(0, 1 - progress * 4);
+          copy.style.opacity = fade;
           copy.style.transform = `translateY(${-progress * 30}px)`;
+          copy.style.visibility = fade < 0.05 ? 'hidden' : 'visible';
+          if (scrim) scrim.style.opacity = Math.max(0, 1 - progress * 2.5);
+          if (bar) bar.style.transform = `scaleX(${progress})`;
           number.textContent = `${Math.round(progress * 100).toString().padStart(2, '0')}%`;
           chapter.innerHTML = progress < .5 ? '01 <i></i> The desk' : '02 <i></i> Make yourself at home';
           hint.innerHTML = progress < .5 ? 'Scroll to open the laptop <span>↓</span>' : 'A little closer… <span>↓</span>';

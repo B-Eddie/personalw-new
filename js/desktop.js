@@ -28,7 +28,15 @@ const storage = {
     }
   },
 };
-const intro = !new URLSearchParams(location.search).has("desktop");
+const params = new URLSearchParams(location.search);
+const isCompact = () => innerWidth <= 760;
+// Phones, data-saver connections, and reduced-motion visitors land on the
+// desktop right away; the 3D desk stays one tap away (?3d=1).
+const lightweightByDefault =
+  matchMedia("(max-width: 760px)").matches ||
+  Boolean(navigator.connection?.saveData) ||
+  matchMedia("(prefers-reduced-motion: reduce)").matches;
+const intro = !params.has("desktop") && (params.has("3d") || !lightweightByDefault);
 
 class EddieDesktop {
   constructor() {
@@ -40,7 +48,7 @@ class EddieDesktop {
       this.wallpaper = "forest";
     this.widgets = storage.get("widgets", "on") === "on";
     this.history = [];
-    this.autoHideDock = storage.get("autohide", "on") === "on";
+    this.autoHideDock = storage.get("autohide", "off") === "on";
     if (storage.get("native-revision") !== "1") {
       this.wallpaper = "forest";
       storage.set("wallpaper", "forest");
@@ -52,7 +60,8 @@ class EddieDesktop {
     this.applyAppearance();
     if (!intro) {
       this.show();
-      this.open("about", { initial: true });
+      if (isCompact()) this.restoreNavigation();
+      else this.open("about", { initial: true });
     }
   }
 
@@ -63,7 +72,7 @@ class EddieDesktop {
     root.innerHTML = `
       <div class="desktop-wallpaper" aria-hidden="true"></div>
       <header class="os-menubar"><nav class="menu-left" aria-label="Desktop menu">
-        <button class="os-mark" data-menu="home" aria-label="Apple menu"></button>
+        <button class="os-mark" data-menu="home" aria-label="Eddie’s Mac menu"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M16.4 12.6c0-2.3 1.9-3.4 2-3.5-1.1-1.6-2.8-1.8-3.4-1.8-1.4-.1-2.8.9-3.5.9-.7 0-1.8-.8-3-.8-1.5 0-3 .9-3.8 2.3-1.6 2.8-.4 7 1.2 9.3.8 1.1 1.7 2.4 2.9 2.3 1.2 0 1.6-.7 3-.7s1.8.7 3 .7c1.3 0 2.1-1.1 2.8-2.3.9-1.3 1.3-2.6 1.3-2.6s-2.5-1-2.5-3.8ZM14.1 5.8c.6-.8 1.1-1.8 1-2.8-.9 0-2 .6-2.7 1.4-.6.7-1.1 1.7-1 2.7 1 .1 2-.5 2.7-1.3Z"/></svg></button>
         <button class="active-app" data-menu="home">Finder</button>
         <button class="desktop-menu-item" data-menu="file">File</button>
         <button class="desktop-menu-item" data-menu="edit">Edit</button><button class="desktop-menu-item" data-menu="view">View</button><button class="desktop-menu-item" data-menu="go">Go</button>
@@ -71,6 +80,15 @@ class EddieDesktop {
         <button class="desktop-menu-item" data-menu="help">Help</button>
       </nav><div class="menu-right"><svg class="status-battery" viewBox="0 0 28 13" aria-label="Battery full"><rect x="1" y="2" width="22" height="9" rx="2" fill="none" stroke="white" stroke-width="1.2"/><rect x="3" y="4" width="18" height="5" rx="1"/><path d="M25 4v5" stroke="white" stroke-width="2"/></svg><svg class="status-wifi" viewBox="0 0 20 16" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M2 4q8-7 16 0M5 8q5-4 10 0m-7 4q2-2 4 0"/><circle cx="10" cy="15" r="1" fill="white" stroke="none"/></svg><button data-command="spotlight" aria-label="Search apps">${symbol("search")}</button><button data-command="controls" aria-label="Control Center">${symbol("sliders")}</button><time class="menu-clock"></time></div></header>
       <main id="desktop-windows" tabindex="-1">
+        <section class="ios-home" aria-label="Home screen">
+          <div class="ios-hero">
+            <div class="ios-hero-head"><img src="assets/image.png" alt="" width="56" height="56"/><div><p>Hey, I’m</p><h1>Eddie Bian</h1></div></div>
+            <p class="ios-hero-role">Competitive programmer and full-stack developer in Toronto. I build useful tools, apps, and hackathon projects.</p>
+            <div class="ios-hero-actions"><button class="ios-cta" data-open="projects">See my projects ${symbol("arrow")}</button><button class="ios-cta secondary" data-open="contact">Say hello</button></div>
+          </div>
+          <button class="ios-featured" data-open="projects" data-project-open="swarm"><img src="assets/projects/swarm.webp" alt="" loading="lazy"/><span><small>Hack the North · winner</small><strong>Swarm · YiQun</strong><em>Small robots. One shared rescue mission.</em></span></button>
+          <nav class="ios-grid" aria-label="Apps">${apps.map((app) => `<button class="ios-app" data-open="${app.id}">${appIcon(app.icon)}<span>${app.name}</span></button>`).join("")}<a class="ios-app" href="?3d=1"><span class="ios-3d-icon" aria-hidden="true">3D</span><span>3D Desk</span></a></nav>
+        </section>
         <aside class="desktop-widgets" aria-label="Desktop widgets">
           <div class="time-widget"><div class="analog-clock" aria-hidden="true"><i class="clock-hour"></i><i class="clock-minute"></i><b></b><span class="clock-12">12</span><span class="clock-3">3</span><span class="clock-6">6</span><span class="clock-9">9</span></div><div class="widget-date"><span class="widget-weekday"></span><strong class="widget-day"></strong><small class="widget-month"></small></div><div class="widget-city">Toronto, Canada <span>Local time</span></div></div>
           <button class="desktop-note" data-open="notes"><span class="note-pin"></span><span class="note-kicker">a note to self</span><strong>Stay curious.<br>Build useful things.<br>Have a little fun.</strong><span class="note-signature">— Eddie</span><span class="note-corner">↗</span></button>
@@ -101,6 +119,7 @@ class EddieDesktop {
       this.area.focus();
     });
     window.addEventListener("blur", () => this.endGesture());
+    window.addEventListener("popstate", () => this.restoreNavigation());
     this.root.addEventListener("pointerdown", () => { this.suppressClickUntil = 0; }, true);
     this.root.addEventListener("click", (e) => {
       if (e.detail > 0 && performance.now() < (this.suppressClickUntil || 0)) {
@@ -113,15 +132,11 @@ class EddieDesktop {
       const cmd = e.target.closest("[data-command]");
       const menu = e.target.closest("[data-menu]");
       if (opener) {
-        if (
-          opener.classList.contains("desktop-file") &&
-          (innerWidth > 760 || matchMedia("(pointer: fine)").matches) &&
-          e.detail === 1
-        ) {
+        if (opener.classList.contains("desktop-file")) {
           $$(".desktop-file").forEach((el) =>
             el.classList.toggle("selected", el === opener),
           );
-          return;
+          if (e.detail > 1) return; // the first click already opened it
         }
         if (this.desktopRevealed) this.toggleDesktop();
         this.dismiss();
@@ -243,11 +258,20 @@ class EddieDesktop {
       { passive: true },
     );
     if (intro) {
-      const jump = document.createElement("button");
-      jump.className = "skip-intro";
-      jump.textContent = "Enter desktop ↗";
-      jump.addEventListener("click", () => this.show());
-      document.body.append(jump);
+      $$("[data-intro]").forEach((button) =>
+        button.addEventListener("click", () => {
+          if (button.dataset.intro === "enter") this.show();
+          else
+            window.scrollTo({
+              top: document.documentElement.scrollHeight * 0.32,
+              behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
+            });
+        }),
+      );
+      document.addEventListener("keydown", (e) => {
+        if (this.visible || document.body.classList.contains("text-open")) return;
+        if (e.key === "Enter" && !e.target.closest("button, a, input")) this.show();
+      });
     }
   }
 
@@ -263,11 +287,24 @@ class EddieDesktop {
     this.root.inert = false;
     this.closeTextVersion();
     this.revealDock(5500);
-    if (intro && !this.windows.size) this.open("about", { initial: true });
+    if (intro && !this.windows.size && !isCompact()) this.open("about", { initial: true });
+    if (!isCompact() && storage.get("seen-tip") !== "1") {
+      storage.set("seen-tip", "1");
+      setTimeout(() => {
+        if (!$(".os-toast").classList.contains("show"))
+          this.toast("Tip: open apps from the Dock, or press ⌘K to search everything.");
+      }, 1400);
+    }
   }
 
   open(id, options = {}) {
     if (!apps.some((app) => app.id === id)) return;
+    if (id === "resume" && isCompact() && !matchMedia("(pointer: fine)").matches) {
+      window.open("assets/resume.pdf", "_blank", "noopener");
+      return;
+    }
+    if (isCompact() && !options.fromHistory && history.state?.eddieApp !== id)
+      history.pushState({ eddieApp: id }, "");
     const existing = this.windows.get(id);
     if (existing) {
       existing.minimizeAnimation?.cancel();
@@ -295,7 +332,7 @@ class EddieDesktop {
     const compact = innerWidth <= 760;
     const width = Math.min(
       id === "projects"
-        ? 900
+        ? 960
         : id === "about"
           ? 900
           : id === "contact"
@@ -309,7 +346,7 @@ class EddieDesktop {
       id === "about"
         ? 660
         : id === "projects"
-          ? 610
+          ? 680
           : id === "contact"
             ? 560
             : id === "game"
@@ -342,7 +379,10 @@ class EddieDesktop {
       height,
       createdCompact: compact,
     });
-    $(".close", win).addEventListener("click", () => this.close(id));
+    $(".close", win).addEventListener("click", () => {
+      if (isCompact()) this.goHome();
+      else this.close(id);
+    });
     $(".minimize", win).addEventListener("click", () => this.minimize(id));
     $(".maximize", win).addEventListener("click", () => this.maximize(id));
     $(".window-titlebar", win).addEventListener("dblclick", (e) => {
@@ -494,7 +534,7 @@ class EddieDesktop {
       ? filtered
           .map(
             (p) =>
-              `<button class="project-tile" data-project="${p.id}"><span class="project-preview" style="--project-color:${p.color}">${p.image ? `<img src="${p.image}" alt="${p.name} preview" loading="lazy"/>` : `<b class="project-glyph">${p.glyph}</b>`}${p.badge ? `<span class="project-badge">${p.badge}</span>` : ""}</span><strong>${p.name} <span>↗</span></strong><span class="project-kind">${p.kind}</span><span class="project-caption">${p.description}</span></button>`,
+              `<button class="project-tile" data-project="${p.id}" aria-label="${p.name}: ${p.description} Open details"><span class="project-preview${p.fit === "contain" ? " is-logo" : ""}" style="--project-color:${p.color}">${p.image ? `<img src="${p.image}" alt="" loading="lazy"/>` : `<b class="project-glyph">${p.glyph}</b>`}</span>${p.badge ? `<span class="project-badge">${p.badge}</span>` : ""}<strong>${p.name}</strong><span class="project-kind">${p.kind}</span><span class="project-caption">${p.description}</span></button>`,
           )
           .join("")
       : `<div class="project-empty">${symbol("search")}<h2>No projects found</h2><p>Try a name or technology, like “Python”.</p></div>`;
@@ -502,16 +542,7 @@ class EddieDesktop {
       `${filtered.length} ${filtered.length === 1 ? "item" : "items"}`;
     $$("[data-project]", win).forEach((button) => {
       button.addEventListener("click", (e) => {
-        if (
-          (innerWidth > 760 || matchMedia("(pointer: fine)").matches) &&
-          e.detail === 1
-        ) {
-          $$("[data-project]", win).forEach((el) => {
-            el.classList.toggle("selected", el === button);
-            el.setAttribute("aria-pressed", el === button);
-          });
-          return;
-        }
+        if (e.detail > 1) return;
         this.projectDetail(win, button.dataset.project);
       });
       button.addEventListener("keydown", (e) => {
@@ -530,7 +561,7 @@ class EddieDesktop {
     const detail = document.createElement("article");
     detail.className = "project-detail";
     detail.dataset.project = id;
-    detail.innerHTML = `<button class="text-button project-back">${symbol("back")} Back to projects</button><div class="detail-art" style="--project-color:${p.color}">${p.image ? `<img src="${p.image}" alt="${p.name} project preview"/>` : `<b>${p.glyph}</b>`}</div><p class="eyebrow">${p.badge || p.kind}</p><h1>${p.name}</h1><p>${p.detail}</p><div class="tech-tags">${p.stack.map((t) => `<span>${t}</span>`).join("")}</div>${p.url ? `<a class="primary-button" href="${p.url}" target="_blank" rel="noopener">${p.url.includes("github") ? "View source" : "Visit project"} ${symbol("external")}</a>` : '<p class="detail-note">Built at a hackathon. Ask me about it sometime.</p>'}${p.source ? `<a class="text-button project-source" href="${p.source}" target="_blank" rel="noopener">View source ${symbol("code")}</a>` : ""}`;
+    detail.innerHTML = `<button class="text-button project-back">${symbol("back")} Back to projects</button><div class="detail-head"><div class="detail-art${p.fit === "contain" ? " is-logo" : ""}" style="--project-color:${p.color}">${p.image ? `<img src="${p.image}" alt="${p.name} project preview"/>` : `<b>${p.glyph}</b>`}</div><div class="detail-info">${p.badge ? `<span class="project-badge">${p.badge}</span>` : ""}<h1>${p.name}</h1><p class="detail-kind">${p.kind}</p><div class="detail-actions">${p.url ? `<a class="primary-button" href="${p.url}" target="_blank" rel="noopener">${p.url.includes("github") ? "View source" : "Visit project"} ${symbol("external")}</a>` : ""}${p.source ? `<a class="secondary-button project-source" href="${p.source}" target="_blank" rel="noopener">${symbol("code")} Source</a>` : ""}${!p.url && !p.source ? '<p class="detail-note">Built at a hackathon. Ask me about it sometime.</p>' : ""}</div></div></div><p>${p.detail}</p><div class="tech-tags" aria-label="Built with">${p.stack.map((t) => `<span>${t}</span>`).join("")}</div>`;
     [".finder-toolbar", ".project-grid", ".finder-status"].forEach(
       (selector) => ($(selector, win).hidden = true),
     );
@@ -741,7 +772,30 @@ class EddieDesktop {
       .sort((a, b) => Number(b[1].el.style.zIndex) - Number(a[1].el.style.zIndex))[0]?.[0];
   }
 
-  close(id) {
+  restoreNavigation() {
+    if (!isCompact()) return;
+    const target = apps.find((app) => app.id === history.state?.eddieApp)?.id;
+    if (target) this.open(target, { fromHistory: true });
+    [...this.windows.keys()]
+      .filter((id) => id !== target)
+      .forEach((id) => this.close(id, { fromHistory: true }));
+    if (!target) {
+      this.area.scrollTop = 0;
+      $(".ios-home").tabIndex = -1;
+      $(".ios-home").focus({ preventScroll: true });
+    }
+  }
+
+  goHome() {
+    if (history.state?.eddieApp) history.pushState({ eddieApp: null }, "");
+    this.restoreNavigation();
+  }
+
+  close(id, { fromHistory = false } = {}) {
+    if (isCompact() && !fromHistory && history.state?.eddieApp === id) {
+      this.goHome();
+      return;
+    }
     const data = this.windows.get(id);
     if (!data) return;
     if (this.gesture?.data === data) this.endGesture();
@@ -763,8 +817,8 @@ class EddieDesktop {
     const data = this.windows.get(id);
     if (!data || data.minimizing) return;
     if (this.gesture?.data === data) this.endGesture();
-    if (innerWidth <= 760 && !matchMedia("(pointer: fine)").matches) {
-      this.close(id);
+    if (isCompact()) {
+      this.goHome();
       return;
     }
     data.minimizing = true;
@@ -959,7 +1013,7 @@ class EddieDesktop {
       if (data.createdCompact) {
         const sizes = {
           about: [900, 660],
-          projects: [900, 610],
+          projects: [960, 680],
           contact: [720, 560],
           game: [480, 610],
         };
@@ -1015,6 +1069,8 @@ class EddieDesktop {
     });
     $(".desktop-widgets").inert = compact && hasVisibleWindow;
     $(".desktop-files").inert = compact && hasVisibleWindow;
+    $(".ios-home").inert = compact && hasVisibleWindow;
+    this.root.classList.toggle("has-open-app", hasVisibleWindow);
     $$(".dock-app").forEach((button) => {
       const win = this.windows.get(button.dataset.open);
       button.classList.toggle("running", Boolean(win));
@@ -1104,7 +1160,7 @@ class EddieDesktop {
       storage.set("widgets", this.widgets ? "on" : "off");
       this.applyAppearance();
     } else if (cmd === "text") this.textVersion();
-    else if (cmd === "intro") location.href = "./";
+    else if (cmd === "intro") location.href = "./?3d=1";
     else if (cmd === "trash")
       this.toast("Nothing here. Even my bad ideas get a second chance.");
     else if (cmd === "copy-email") this.copyEmail();
@@ -1251,12 +1307,14 @@ if (intro) {
       document.head.append(el);
     });
   try {
-    await script("https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js");
-    await script(
-      "https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/ScrollTrigger.min.js",
+    // Start the model download right away; GSAP loads alongside it.
+    const gsapReady = script("https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js").then(() =>
+      script("https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/ScrollTrigger.min.js"),
     );
+    window.gsapReady = gsapReady;
     const { App } = await import("./main.js");
     window.app = new App();
+    await gsapReady;
   } catch (error) {
     console.warn("The 3D intro could not load.", error);
     window.macDesktop.show();

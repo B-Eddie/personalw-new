@@ -125,7 +125,7 @@ html:has(body.desktop-ready) {
   position: absolute;
   inset: 0;
   z-index: -2;
-  background: #153c3c url("assets/totoro.png") center/cover no-repeat;
+  background: #153c3c url("assets/totoro.webp") center/cover no-repeat;
 }
 #eddie-os[data-wallpaper="alpine"] .desktop-wallpaper {
   background-image: url("assets/wallpapers/alpine.svg");
@@ -1755,7 +1755,7 @@ html:has(body.desktop-ready) {
   border: 1px solid #0002;
 }
 .wallpaper-preview.forest {
-  background-image: url("assets/totoro.png");
+  background-image: url("assets/totoro.webp");
 }
 .wallpaper-preview.dusk {
   filter: hue-rotate(65deg) brightness(0.55) saturate(1.1);
